@@ -1,0 +1,15 @@
+{
+  "name": "learn-asyncify",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Emscripten Asyncify × Exception pitfalls research",
+  "scripts": {
+    "serve": "http-server examples -p 8080 -c-1",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0",
+    "http-server": "^14.1.1",
+    "typescript": "^5.5.0"
+  }
+}
