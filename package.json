@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "description": "Emscripten Asyncify × Exception pitfalls research",
   "scripts": {
-    "serve": "http-server examples -p 8080 -c-1",
+    "serve": "http-server . -p 8080 -c-1 --silent",
     "test": "playwright test"
   },
   "devDependencies": {

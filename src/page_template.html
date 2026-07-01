@@ -3,16 +3,20 @@
 <head>
   <meta charset="utf-8" />
   <title>learn-asyncify example</title>
-  <script src="/src/test_harness.js"></script>
+  <script src="./test_harness.js"></script>
 </head>
 <body>
   <script type="module">
-    // main.js is Module produced by emcc with MODULARIZE=1 and EXPORT_NAME=createModule.
+    // main.js is Module produced by emcc with MODULARIZE=1 and EXPORT_NAME=createModule
+    // and EXPORT_ES6=1, so it has a default export.
     import createModule from './main.js';
     const instance = await createModule({
       // Wire the Promise-aware suspend path through Asyncify.handleAsync.
       // (Used only by scenarios that suspend; S1 never enters this path.)
       Asyncify: { handleAsync: (fn) => fn() },
+      // Disable Emscripten's automatic main() invocation; we will call it
+      // ourselves so the page lifecycle is explicit and there is no double-run.
+      noInitialRun: true,
     });
     // Expose HEAP8 for harness imports that lazy-reference it.
     window.HEAP8 = instance.HEAP8;

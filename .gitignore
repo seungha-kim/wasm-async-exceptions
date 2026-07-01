@@ -3,4 +3,4 @@ examples/*/*/build/
 emsdk/
 .upstream/
 *.wasm.o
-.DS_Store
+.DS_Storetest-results/

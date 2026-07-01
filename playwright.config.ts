@@ -10,9 +10,10 @@ export default defineConfig({
     baseURL: 'http://localhost:8080',
   },
   webServer: {
-    command: 'npm run serve',
+    command: 'npx http-server . -p 8080 -c-1',
     port: 8080,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
+    stdout: 'pipe',
   },
 });

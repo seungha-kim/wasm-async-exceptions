@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
+mkdir -p build
 
 # examples/A/s1/build.sh -- builds target A (Asyncify + JS EH emulation) scenario S1.
 # Flags mirror design.md §2.1 row A.
@@ -13,6 +14,7 @@ emcc \
   -sDISABLE_EXCEPTION_CATCHING=0 \
   -sMODULARIZE=1 \
   -sEXPORT_NAME=createModule \
+  -sEXPORT_ES6=1 \
   -sEXPORTED_FUNCTIONS=['_main'] \
   -sEXPORTED_RUNTIME_METHODS=['HEAP8'] \
   -sALLOW_MEMORY_GROWTH=1 \
@@ -22,4 +24,6 @@ emcc \
   -o build/main.js
 
 cp ../../../src/page_template.html build/index.html
+cp ../../../src/test_harness.js   build/test_harness.js
 echo "built: $(pwd)/build/main.js"
+echo "  also created: build/index.html, build/main.wasm, build/test_harness.js"
