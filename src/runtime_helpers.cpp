@@ -8,11 +8,13 @@ EM_JS(void, js_log, (const char* ptr, int len), {
   console.log(msg);
 });
 
-EM_JS(void, js_await_controlled_promise, (const char* ptr, int len), {
+// Asyncify-aware await: returns (well, awaits) a Promise from the harness.
+// Emscripten lists the generated JS symbol `jsAwaitControlledPromise` as an
+// ASYNCIFY_IMPORTS entry, so the stack-save/restore instrumentation kicks in
+// whenever this import is invoked from Wasm.
+EM_ASYNC_JS(void, js_await_controlled_promise, (const char* ptr, int len), {
   const id = new TextDecoder().decode(new Uint8Array(HEAP8.buffer, ptr, len));
-  // The Promise returned (or resolved value) need not be awaited here in S1;
-  // suspend scenarios wire this to Asyncify instead. Keep the no-op shape.
-  Module.__controlledRegister && Module.__controlledRegister(id);
+  await window.__Controlled.register(id);
 });
 
 void scenario_log(const char* msg) {
