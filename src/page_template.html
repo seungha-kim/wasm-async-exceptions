@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>learn-asyncify example</title>
+  <script src="/src/test_harness.js"></script>
+</head>
+<body>
+  <script type="module">
+    // main.js is Module produced by emcc with MODULARIZE=1 and EXPORT_NAME=createModule.
+    import createModule from './main.js';
+    const instance = await createModule({
+      // Wire the Promise-aware suspend path through Asyncify.handleAsync.
+      // (Used only by scenarios that suspend; S1 never enters this path.)
+      Asyncify: { handleAsync: (fn) => fn() },
+    });
+    // Expose HEAP8 for harness imports that lazy-reference it.
+    window.HEAP8 = instance.HEAP8;
+    // Trigger the scenario entry exported by main().
+    instance._main();
+  </script>
+</body>
+</html>
