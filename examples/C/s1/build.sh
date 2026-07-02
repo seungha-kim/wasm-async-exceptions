@@ -23,6 +23,6 @@ emcc \
   ../../../src/scenarios/S1.cpp \
   -o build/main.js
 
-cp ../../../src/page_template.html build/index.html
+cp ../../../src/page_template_jspi.html build/index.html
 cp ../../../src/test_harness.js   build/test_harness.js
 echo "built: $(pwd)/build/main.js"

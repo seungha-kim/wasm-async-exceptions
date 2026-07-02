@@ -22,9 +22,9 @@ cd examples/A/s2 && ./build.sh && ./run.sh
 ## 문서
 
 - 설계: [`docs/design.md`](docs/design.md)
-- 배경(Wasm 런타임 한계 + Emscripten 에뮬레이션): `docs/background.md` (TODO)
-- 관측 결과 매트릭스: `docs/matrix.md` (TODO)
-- 결론: `docs/findings.md` (TODO)
+- 배경(Wasm 런타임 한계 + Emscripten 에뮬레이션): [`docs/background.md`](docs/background.md)
+- 관측 결과 매트릭스: [`docs/matrix.md`](docs/matrix.md)
+- 결론: [`docs/findings.md`](docs/findings.md)
 
 ## 예제 매트릭스
 
@@ -43,8 +43,8 @@ cd examples/A/s2 && ./build.sh && ./run.sh
 ## 진행 상태
 
 - [x] 설계 문서(`docs/design.md`)
-- [ ] 툴체인 스크립트와 배경 문서 (Phase 0)
-- [ ] target A pitfall 재현 (Phase 1)
-- [ ] target B, C 부분 개선 (Phase 2)
+- [x] 툴체인 스크립트와 배경 문서 (Phase 0)
+- [x] target A pitfall 재현 (Phase 1)
+- [x] target B, C 부분 개선/한계 관측 (Phase 2)
 - [ ] target E, E' 코루틴 직접 구현 (Phase 2.5)
 - [ ] target D 완전 해소 (Phase 3)

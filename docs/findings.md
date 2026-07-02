@@ -143,3 +143,139 @@ The DoD is met for Phase 1.
 - Phase 2.5 (targets E / E') explores the C++20-coroutine fallback. The
   design doc §1.4 prediction is "all four scenarios happy-path under both
   E and E'"; this is the next milestone to test after Phase 2 and 3.
+
+## Phase 2 — One axis at a time (targets B and C)
+
+Phase 2 tested whether changing only one runtime axis repairs the target A
+pitfall. The short result is stricter than the original hypothesis: target B
+does not repair the A-row JS-initiated rejection pitfall, and target C exposes
+an earlier JSPI + JS EH incompatibility that fails even the synchronous throw
+baseline.
+
+Target B builds emitted this Emscripten warning on every scenario:
+`ASYNCIFY=1 is not compatible with -fwasm-exceptions. Parts of the program
+that mix ASYNCIFY and exceptions will not compile.` The binaries still built
+and ran, so the row below records runtime behavior, but the warning is part
+of the Phase 2 finding.
+
+### B / S1 — synchronous throw (baseline)
+
+Observed:
+```
+S1:before-throw
+PASS:s1-catch-reached
+S1
+PASS:s1-done
+```
+
+Hypothesis check: Wasm EH compiled and ran for the no-suspend baseline.
+
+### B / S2 — suspend then throw
+
+Observed:
+```
+S2:before-suspend
+S2:after-resume
+PASS:s2-catch-reached
+S2
+PASS:s2-done
+```
+
+Mapping: B/S2 matches A/S2's happy path. A C++ throw initiated after the
+resume returns is still caught correctly.
+
+### B / S3 — suspend that rejects
+
+Observed:
+```
+S3:before-suspend
+[pageerror] S3
+[timeout] no s3-done
+```
+
+Mapping to §1.2: Wasm EH alone did not recover the catch that A/S3 missed.
+The JS-side Promise rejection still escaped to page-land before the Wasm
+handler could observe it.
+
+### B / S4 — catch then re-suspend
+
+Observed:
+```
+S4:before-suspend
+[pageerror] S4
+```
+
+Mapping: B/S4 collapses at the first rejection just like A/S4. The catch block
+is never entered, so the second suspend remains untested on this row.
+
+### C / S1 — synchronous throw (baseline)
+
+Observed:
+```
+S1:before-throw
+[pageerror] trying to suspend JS frames
+[timeout] no s1-done
+```
+
+Hypothesis check: JSPI + JS exception emulation failed before any explicit
+suspend scenario. The C++ throw path itself triggered V8's "trying to suspend
+JS frames" error, so C cannot serve as a clean "JSPI only" improvement row
+with JS EH still enabled.
+
+### C / S2 — suspend then throw
+
+Observed:
+```
+S2:before-suspend
+[pageerror] trying to suspend JS frames
+[control-error] no pending controlled promise: s2-1
+[timeout] no s2-done
+```
+
+Mapping: JSPI alone did not preserve A/S2's happy path. The failure occurred
+before the controlled Promise was registered, leaving the test harness with
+no `s2-1` to resolve.
+
+### C / S3 — suspend that rejects
+
+Observed:
+```
+S3:before-suspend
+[pageerror] trying to suspend JS frames
+[control-error] no pending controlled promise: s3-1
+[timeout] no s3-done
+```
+
+Mapping to §1.2: JSPI alone did not fix conflict #1 from A/S3. Instead, the
+remaining JS exception emulation layer appears incompatible with the JSPI
+stack-switch path in this Emscripten/V8 combination.
+
+### C / S4 — catch then re-suspend
+
+Observed:
+```
+S4:before-suspend
+[pageerror] trying to suspend JS frames
+[control-error] no pending controlled promise: s4-1
+```
+
+Mapping: C/S4 also fails before the first controlled Promise is registered,
+so it never reaches the catch-handler-internal suspend that A/S4 could not
+reach.
+
+### Cross-row summary (Phase 2)
+
+Changing only the exception axis (B: Asyncify + Wasm EH) was not enough to
+fix the A-row Promise-rejection pitfall: B/S3 and B/S4 still miss the C++
+catch. Changing only the coroutine axis (C: JSPI + JS EH) was worse in this
+toolchain: the JS EH emulation path failed even S1 with `trying to suspend JS
+frames`. The practical conclusion is that these axes are not independently
+replaceable in the way the initial Phase 2 hypothesis hoped; JSPI needs to be
+tested with Wasm EH before it can be treated as a viable exit.
+
+### Implications for Phase 3 (target D)
+
+Target D (JSPI + Wasm EH) is now the decisive test, not just the expected
+union of B and C's gains. It must show both that removing JS EH eliminates
+the C-row `trying to suspend JS frames` failure and that removing Asyncify
+eliminates the A/B-row JS-initiated rejection leak.

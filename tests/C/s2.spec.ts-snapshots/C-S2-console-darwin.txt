@@ -1,0 +1,4 @@
+S2:before-suspend
+[pageerror] trying to suspend JS frames
+[control-error] no pending controlled promise: s2-1
+[timeout] no s2-done

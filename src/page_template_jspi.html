@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>learn-asyncify example (JSPI)</title>
+  <script src="./test_harness.js"></script>
+</head>
+<body>
+  <script type="module">
+    // main.js is Module produced by emcc with MODULARIZE=1 and EXPORT_NAME=createModule
+    // and EXPORT_ES6=1, so it has a default export.
+    import createModule from './main.js';
+
+    const instance = await createModule({
+      Asyncify: { handleAsync: (fn) => fn() },
+    });
+
+    window.HEAP8 = instance.HEAP8;
+    // Emscripten's JSPI glue already wraps async exports with
+    // WebAssembly.promising() and awaits callMain(); calling _main manually
+    // bypasses that wrapper and triggers "trying to suspend JS frames".
+  </script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+S1:before-throw
+[pageerror] trying to suspend JS frames
+[timeout] no s1-done
