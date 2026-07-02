@@ -1,0 +1,3 @@
+S3:before-suspend
+[pageerror] S3
+[timeout] no s3-done

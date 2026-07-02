@@ -1,0 +1,4 @@
+S1:before-throw
+PASS:s1-catch-reached
+S1
+PASS:s1-done

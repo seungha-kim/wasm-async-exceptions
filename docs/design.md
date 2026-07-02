@@ -272,16 +272,18 @@ learn-asyncify/
 3. **Phase 2 — 부분 개선 (target B, C)**: 한 쪽만 표준으로 바꿨을 때 어디까지,
    그리고 어디서 다시 막히는지를 관측. 이 단계에서 “에뮬레이션 한 쪽이 남아 있으면
    구조적 불완전함이 남는다"는 점을 부연.
-   - **Phase 2.5 — 코루틴 에뮬레이션 회피 (target E, E')**: C++20 coroutine으로
+4. **Phase 3 — 완전 해소 검증 (target D)**: 런타임 표준 둘 다 켰을 때 (JSPI+Wasm EH)
+   어느 시나리오까지 통과하는지 관측. Phase 2에서 JSPI+JS EH가 S1부터 깨졌으므로, D는 “JSPI 자체가
+   문제인가, JS EH가 남아서 문제인가"를 먼저 가르는 결정적 실험이다.
+   `docs/findings.md`에 정리 + JSPI/Wasm EH 도입 체크리스트.
+5. **Phase 2.5 — 코루틴 에뮬레이션 회피 (target E, E')**: C++20 coroutine으로
      suspend를 직접 구현. E는 JS EH를, E'은 Wasm EH를 타서 “코루틴 에뮬은 없앴지만
      예외 에뮬이 남아 있을/없을 때 차이"를 분리 관찰. 주 관찰은 “코루틴 에뮬레이션이
      빠진 상태에서 throw/catch가 C++ 의미대로 동작하는가"와 “개발자가 직접 짜야 하는
      boilerplate(`promise_type`, `awaiter`, JS↔Wasm resume 핸들)의 무게" 양측.
      *핵심 비교 pivot: D(런타임이 다 해줌) vs E'(개발자+표준) vs E(개발자+에뮬) —
      겉보기엔 같은 코루틴 코드라도 구현 부담이 어디에 있는가.*
-4. **Phase 3 — 완전 해소 (target D)**: 런타임 표준 둘 다 켰을 때 (JSPI+Wasm EH) 모든
-   시나리오 통과. `docs/findings.md`에 정리 + JSPI/Wasm EH 도입 체크리스트.
-5. **Phase 4 — 발표 산출물**: `README.md` 데모 링크, 아주 간단한 글/슬라이드 노트.
+6. **Phase 4 — 발표 산출물**: `README.md` 데모 링크, 아주 간단한 글/슬라이드 노트.
 
 ---
 
@@ -321,7 +323,7 @@ learn-asyncify/
   안정적으로 재현한다.
 - target B, C에서 “한 쪽만 표준으로 바꿨을 때 어디까지 개선되고 어디서 다시 막히는지”를
   관측하고, 잔존 한계를 기록한다.
-- target D의 같은 시나리오가 모두 우리가 C++ 의미에 맞는 결과로 동작함을 보인다.
+- target D의 같은 시나리오가 C++ 의미에 맞는 결과로 동작하는지 검증하고, 반례가 있으면 기록한다.
 - target E, E'의 S1~S4를 통해 “코루틴 에뮬레이션 없이 catch가 의미대로 동작하는지”를
   관찰하고, D vs E vs E'의 코드 diff(특히 `promise_type`/awaiter boilerplate의 양과
   Wasm EH 적용 여부의 차이)를 한 장으로 정리한다.

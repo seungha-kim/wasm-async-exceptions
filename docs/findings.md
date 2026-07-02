@@ -137,12 +137,13 @@ The DoD is met for Phase 1.
   cleanly testable: the Promise rejection goes through the *runtime's*
   stack-switch suspend path, not Asyncify's instrumentation, so a C++
   catch inside the suspended function actually has a frame to land in.
-- Phase 3 (target D: JSPI + Wasm EH) is the predicted "happy path" for all
-  four scenarios; S3 and S4 are predicted to be the most informative
-  demonstration of D ≠ A.
-- Phase 2.5 (targets E / E') explores the C++20-coroutine fallback. The
-  design doc §1.4 prediction is "all four scenarios happy-path under both
-  E and E'"; this is the next milestone to test after Phase 2 and 3.
+- Phase 3 (target D: JSPI + Wasm EH) is the next milestone after Phase 2.
+  Phase 2 showed that JSPI + JS EH fails even S1, so D is now the decisive
+  test for whether removing JS EH restores the JSPI path.
+- Phase 2.5 (targets E / E') explores the C++20-coroutine fallback after D.
+  The design doc §1.4 prediction is "all four scenarios happy-path under
+  both E and E'", and D's result will sharpen the comparison between runtime
+  standard support and developer-owned coroutine glue.
 
 ## Phase 2 — One axis at a time (targets B and C)
 
@@ -279,3 +280,95 @@ Target D (JSPI + Wasm EH) is now the decisive test, not just the expected
 union of B and C's gains. It must show both that removing JS EH eliminates
 the C-row `trying to suspend JS frames` failure and that removing Asyncify
 eliminates the A/B-row JS-initiated rejection leak.
+
+## Phase 3 — Both runtime standards (target D)
+
+Target D tested the fully standardized row: JSPI for stack switching and
+Wasm exception handling for C++ throw/catch. It fixed the C-row baseline
+failure, but it did **not** fix the JS-initiated Promise rejection leak seen
+on A and B.
+
+### D / S1 — synchronous throw (baseline)
+
+Observed:
+```
+S1:before-throw
+PASS:s1-catch-reached
+S1
+PASS:s1-done
+```
+
+Mapping: Removing JS exception emulation fixed C/S1's `trying to suspend JS
+frames` failure. Plain C++ throw/catch under JSPI + Wasm EH works.
+
+### D / S2 — suspend then throw
+
+Observed:
+```
+S2:before-suspend
+S2:after-resume
+PASS:s2-catch-reached
+S2
+PASS:s2-done
+```
+
+Mapping: D preserves the happy path from A/B. A Promise resolution resumes
+Wasm, then a C++-initiated throw is caught normally.
+
+### D / S3 — suspend that rejects
+
+Observed:
+```
+S3:before-suspend
+[pageerror] S3
+[timeout] no s3-done
+```
+
+Mapping to §1.2: D did not recover the catch for a rejected Promise. Even
+with Wasm EH, a JS-side rejection from the suspending import surfaced as a
+page error rather than as a C++ exception caught inside Wasm.
+
+### D / S4 — catch then re-suspend
+
+Observed:
+```
+S4:before-suspend
+[pageerror] S4
+[control-error] no pending controlled promise: s4-2
+[timeout] no s4-done
+```
+
+Mapping: D/S4 failed at the first rejection, so the catch block never
+registered `s4-2`. This matches A/B's failure shape rather than the predicted
+complete-standard happy path.
+
+### Cross-row summary (Phase 3)
+
+D splits the Phase 2 question cleanly. Wasm EH is enough to remove C's
+`trying to suspend JS frames` failure, but JSPI + Wasm EH is still not enough
+to translate a rejected JS Promise into a C++ catchable exception for these
+`EM_ASYNC_JS` imports. The persistent S3/S4 failure now looks less like a
+JS EH emulation issue and more like a boundary semantic issue: JS Promise
+rejection remains a JS exception at the suspend boundary, while C++ catch
+only sees exceptions thrown from inside Wasm/C++ control flow.
+
+### JSPI + Wasm EH checklist
+
+- Use Wasm EH to avoid JS exception emulation failures on synchronous C++
+  throw/catch and C++ throws after a successful resume.
+- Do not assume a rejected JS Promise from an async import becomes a C++
+  catchable exception. Test that path explicitly.
+- Prefer resolving async imports with a status/result value and throwing from
+  C++ after resume if C++ catch semantics are required.
+- Keep Playwright coverage for both resolution and rejection paths; S2 passing
+  does not imply S3/S4 are safe.
+- Treat JSPI support as experimental in Emscripten 6.0.1 and pin the toolchain
+  when recording observations.
+
+### Implications for Phase 2.5 (targets E / E')
+
+The next useful comparison is no longer "D is the complete fix versus E/E' as
+manual fallback." Instead, E/E' should test whether owning the suspend/resume
+protocol in C++20 coroutine glue lets the project intentionally convert JS
+settlement states into C++ control flow, rather than relying on Promise
+rejection to cross the Wasm boundary as a C++ exception.

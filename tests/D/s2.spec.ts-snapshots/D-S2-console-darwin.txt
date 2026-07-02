@@ -1,0 +1,5 @@
+S2:before-suspend
+S2:after-resume
+PASS:s2-catch-reached
+S2
+PASS:s2-done

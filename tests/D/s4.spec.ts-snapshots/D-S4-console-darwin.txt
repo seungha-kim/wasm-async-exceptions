@@ -1,0 +1,4 @@
+S4:before-suspend
+[pageerror] S4
+[control-error] no pending controlled promise: s4-2
+[timeout] no s4-done
