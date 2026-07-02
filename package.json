@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "description": "Emscripten Asyncify × Exception pitfalls research",
   "scripts": {
+    "build:examples": "scripts/build-all-examples.sh",
     "serve": "http-server . -p 8080 -c-1 --silent",
-    "test": "playwright test"
+    "test": "npm run build:examples && playwright test --workers=1"
   },
   "devDependencies": {
     "@playwright/test": "^1.45.0",
