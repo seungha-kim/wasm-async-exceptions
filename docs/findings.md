@@ -1,4 +1,58 @@
-# Findings — Phase 1 (target A pitfall reproduction)
+# Findings
+
+## Final summary
+
+This project started with a narrow question: what happens when Emscripten's
+Asyncify coroutine emulation and C++ exception support meet at an async
+boundary?
+
+The completed matrix gives a sharper answer:
+
+- A JS Promise rejection from an async import does **not** automatically
+  become a C++ exception that `catch` can observe.
+- Switching one or both runtime axes to JSPI/Wasm EH changes code size and
+  some failure surfaces, but it does not by itself define a C++ exception
+  boundary for rejected JS Promises.
+- C++20 coroutine glue works for all four scenarios because it treats JS
+  settlement as data, resumes C++, and throws from C++ in `await_resume()`.
+
+The practical rule is therefore:
+
+> If C++ `catch` semantics are required after JS async work, do not rely on
+> rejected Promises crossing the Wasm boundary as exceptions. Convert JS
+> settlement into an explicit result/status, resume C++, and throw from C++.
+
+## Target-level result
+
+| Target | Result | Interpretation |
+|---|---|---|
+| A — Asyncify + JS EH | S2 passes; S3/S4 fail | C++ throw after resume works; JS rejection escapes. |
+| B — Asyncify + Wasm EH | S1/S2 pass; S3/S4 fail | Wasm EH does not make rejected JS Promises catchable. |
+| C — JSPI + JS EH | all scenarios fail in this harness | JS EH remains incompatible with this JSPI frame shape. |
+| D — JSPI + Wasm EH | S1/S2 pass; S3/S4 fail | Runtime standards reduce glue, but JS rejection still escapes. |
+| E — C++20 coroutine + JS EH | all scenarios pass | Developer-owned settlement conversion restores C++ control flow. |
+| E' — C++20 coroutine + Wasm EH | all scenarios pass | Same behavioral result as E; Wasm EH mainly changes generated code shape. |
+
+## Cost and surface evidence
+
+`docs/metrics.md` records artifact sizes, load-to-completion timing, and
+representative pageerror surfaces. The short version:
+
+- Asyncify rows A/B carry the largest combined artifact footprint in suspend
+  scenarios.
+- JSPI rows C/D reduce generated code size but still need an explicit
+  settlement boundary for JS rejection.
+- E/E' avoid failure-timeout paths in S3/S4 because the rejected async
+  settlement is converted into a C++ throw after coroutine resume.
+
+## Detailed phase log
+
+The rest of this file preserves the phase-by-phase observations in the order
+they were gathered.
+
+---
+
+# Phase 1 — target A pitfall reproduction
 
 This file is updated as each phase's observations are recorded. Phase 1
 covers the Asyncify + JS exception emulation path (target A). References
