@@ -47,4 +47,4 @@ cd examples/A/s2 && ./build.sh && ./run.sh
 - [x] target A pitfall 재현 (Phase 1)
 - [x] target B, C 부분 개선/한계 관측 (Phase 2)
 - [x] target D 표준 조합 검증/한계 관측 (Phase 3)
-- [ ] target E, E' 코루틴 직접 구현 (Phase 2.5)
+- [x] target E, E' 코루틴 직접 구현/검증 (Phase 2.5)

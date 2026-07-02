@@ -1,0 +1,6 @@
+S4:before-suspend
+PASS:s4-catch-reached
+s4-1
+S4:before-second-suspend
+PASS:s4-after-second-resume
+PASS:s4-done

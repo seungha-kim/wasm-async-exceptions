@@ -372,3 +372,89 @@ manual fallback." Instead, E/E' should test whether owning the suspend/resume
 protocol in C++20 coroutine glue lets the project intentionally convert JS
 settlement states into C++ control flow, rather than relying on Promise
 rejection to cross the Wasm boundary as a C++ exception.
+
+## Phase 2.5 — C++20 coroutine-owned settlement (targets E and E')
+
+Targets E and E' remove Asyncify/JSPI from the coroutine axis entirely. The
+Wasm stack is not suspended by the runtime; instead, the C++ coroutine stores
+its frame on the heap, returns to JS, and JS later resumes the coroutine by
+handle. Promise settlement is represented as an explicit status value, and
+`await_resume()` turns rejected settlement into a C++ `std::runtime_error`.
+
+This row is therefore not "Promise rejection crosses into C++". It is
+"developer-owned glue converts settlement into C++ control flow."
+
+### E / S1 and E' / S1 — synchronous throw
+
+Observed on both rows:
+```
+S1:before-throw
+PASS:s1-catch-reached
+S1
+PASS:s1-done
+```
+
+Mapping: The no-await baseline passes with both JS EH (E) and Wasm EH (E').
+
+### E / S2 and E' / S2 — coroutine await then throw
+
+Observed on both rows:
+```
+S2:before-suspend
+S2:after-resume
+PASS:s2-catch-reached
+S2
+PASS:s2-done
+```
+
+Mapping: JS resolves the stored coroutine handle, C++ resumes after
+`co_await`, then a C++-initiated throw is caught normally.
+
+### E / S3 and E' / S3 — coroutine await rejects
+
+Observed on both rows:
+```
+S3:before-suspend
+PASS:s3-catch-reached
+s3-1
+PASS:s3-done
+```
+
+Mapping: This is the first row where the rejected async operation reaches the
+C++ catch by design. JS does not throw into Wasm; it sets a rejected status
+and resumes the coroutine, and C++ throws from `await_resume()`.
+
+### E / S4 and E' / S4 — catch then re-await
+
+Observed on both rows:
+```
+S4:before-suspend
+PASS:s4-catch-reached
+s4-1
+S4:before-second-suspend
+PASS:s4-after-second-resume
+PASS:s4-done
+```
+
+Mapping: The staged flow that A/B/D never reached does work when the
+coroutine glue owns settlement conversion. One C++ caveat surfaced during
+implementation: standard C++ does not allow `co_await` directly inside a
+`catch` handler, so the scenario records the catch result and performs the
+second await immediately after the catch block in the same coroutine frame.
+
+### Cross-row summary (Phase 2.5)
+
+E and E' pass all four scenarios because they avoid the ambiguous JS Promise
+rejection boundary. The cost is explicit glue: `promise_type`, awaiter state,
+handle registration, resume exports, and a JS registry that maps settlement
+back into C++. E' did not differ behaviorally from E in this matrix because
+the decisive fix was not the exception mechanism; it was owning the
+settlement protocol and throwing from C++ after resume.
+
+### Final research summary
+
+The completed A-D rows show that runtime stack-switching and Wasm EH do not
+automatically make rejected JS Promises catchable as C++ exceptions. The E/E'
+rows show the reliable pattern: treat JS async settlement as data at the
+boundary, resume the C++ coroutine, and throw from C++ if C++ catch semantics
+are required.

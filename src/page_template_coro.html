@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>learn-asyncify coroutine example</title>
+  <script src="./test_harness_coro.js"></script>
+  <script src="./coro_glue.js"></script>
+</head>
+<body>
+  <script type="module">
+    import createModule from './main.js';
+    const instance = await createModule();
+    window.__WasmModule = instance;
+    window.HEAP8 = instance.HEAP8;
+  </script>
+</body>
+</html>
