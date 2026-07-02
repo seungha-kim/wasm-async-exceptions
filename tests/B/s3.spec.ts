@@ -1,13 +1,13 @@
 import { test, expect } from '@playwright/test';
 
-test('A/S3: suspended Promise rejects — observed console sequence', async ({ page }) => {
+test('B/S3: suspended Promise rejects — observed console sequence', async ({ page }) => {
   const lines: string[] = [];
   page.on('console', (msg) => {
     if (msg.type() === 'log') lines.push(msg.text());
   });
   page.on('pageerror', (e) => lines.push(`[pageerror] ${e.message}`));
 
-  await page.goto('http://localhost:8080/examples/A/s3/build/index.html');
+  await page.goto('http://localhost:8080/examples/B/s3/build/index.html');
   await page.waitForFunction(
     () => (window as any).__logLines?.includes('S3:before-suspend'),
     null,
@@ -15,6 +15,9 @@ test('A/S3: suspended Promise rejects — observed console sequence', async ({ p
   );
   await page.waitForTimeout(50);
   await page.evaluate(() => (window as any).__Controlled.reject('s3-1', new Error('S3')));
+  // Either catch fires (done or ellipsis), or we time out at 2s — whichever
+  // terminates the test faster. pageerror is already captured by the handler
+  // above, so we don't need a separate waitForEvent for it.
   await Promise.race([
     page.waitForFunction(
       () => (window as any).__logLines?.includes('PASS:s3-done') ||
@@ -25,5 +28,5 @@ test('A/S3: suspended Promise rejects — observed console sequence', async ({ p
   ]);
 
   expect(lines.length).toBeGreaterThan(0);
-  expect(lines.join('\n')).toMatchSnapshot('A-S3-console.txt');
+  expect(lines.join('\n')).toMatchSnapshot('B-S3-console.txt');
 });
