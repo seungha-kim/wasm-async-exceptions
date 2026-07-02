@@ -20,7 +20,7 @@ test('C/S4: catch then re-suspend — observed console sequence', async ({ page 
       (window as any).__Controlled.reject('s4-1', new Error('S4'));
       return 'rejected';
     } catch (e) {
-      return `[control-error] ${e?.message ?? e}`;
+      return `[control-error] ${e instanceof Error ? e.message : String(e)}`;
     }
   });
   if (rejectResult !== 'rejected') lines.push(rejectResult);

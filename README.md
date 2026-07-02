@@ -24,6 +24,7 @@ cd examples/A/s2 && ./build.sh && ./run.sh
 - 설계: [`docs/design.md`](docs/design.md)
 - 배경(Wasm 런타임 한계 + Emscripten 에뮬레이션): [`docs/background.md`](docs/background.md)
 - 관측 결과 매트릭스: [`docs/matrix.md`](docs/matrix.md)
+- 정량 지표: [`docs/metrics.md`](docs/metrics.md)
 - 결론: [`docs/findings.md`](docs/findings.md)
 
 ## 예제 매트릭스
@@ -48,3 +49,4 @@ cd examples/A/s2 && ./build.sh && ./run.sh
 - [x] target B, C 부분 개선/한계 관측 (Phase 2)
 - [x] target D 표준 조합 검증/한계 관측 (Phase 3)
 - [x] target E, E' 코루틴 직접 구현/검증 (Phase 2.5)
+- [x] 빌드 크기/실행 시간/에러 표면 지표 보강 (Phase 3.5)

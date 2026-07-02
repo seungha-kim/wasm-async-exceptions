@@ -458,3 +458,20 @@ automatically make rejected JS Promises catchable as C++ exceptions. The E/E'
 rows show the reliable pattern: treat JS async settlement as data at the
 boundary, resume the C++ coroutine, and throw from C++ if C++ catch semantics
 are required.
+
+## Phase 3.5 — Cost and error-surface metrics
+
+Detailed measurements live in `docs/metrics.md`. The high-level result is:
+
+- Asyncify rows A/B carry the largest combined artifact footprint in the
+  suspend scenarios.
+- JSPI rows C/D reduce generated code size, but D still shows that Wasm EH
+  does not turn rejected JS Promises into C++ catchable exceptions.
+- C++20 coroutine rows E/E' trade runtime stack-switching machinery for
+  developer-owned glue. Their passing S3/S4 timing stays in the normal
+  tens-of-milliseconds range because rejected settlement is converted into a
+  C++ throw from `await_resume()`, rather than waiting for the failure timeout.
+
+The metrics reinforce the main conclusion: the reliable boundary is not
+"Promise rejection crosses into C++"; it is "JS settlement is data, and C++
+chooses whether to throw after resume."

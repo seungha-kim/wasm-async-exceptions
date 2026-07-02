@@ -241,6 +241,7 @@ learn-asyncify/
 │   ├── design.md             # 본 문서
 │   ├── background.md         # Wasm 런타임 한계 + Emscripten 에뮬레이션 해설 (총론)
 │   ├── matrix.md             # target×scenario 관측 결과 표 (살아있는 문서)
+│   ├── metrics.md            # 빌드 크기/실행 시간/에러 표면 정량 지표
 │   └── findings.md           # 결론 + JSPI/Wasm EH 마이그레이션 가이드
 ├── src/
 │   ├── scenarios/S{1..4}.cpp     # A–D 공유 시나리오 본체
@@ -255,7 +256,8 @@ learn-asyncify/
 │   └── <target>/<scenario>.spec.ts  # @playwright/test spec
 ├── playwright.config.ts       # channel:'chrome', launch args
 └── scripts/
-    └── toolchain.sh          # emsdk 버전 핀, Wasm EH/JSPI stable Chrome 점검
+    ├── toolchain.sh          # emsdk 버전 핀, Wasm EH/JSPI stable Chrome 점검
+    └── collect-size-metrics.sh # 예제 빌드 산출물 크기 수집
 ```
 
 ---
@@ -283,7 +285,13 @@ learn-asyncify/
      boilerplate(`promise_type`, `awaiter`, JS↔Wasm resume 핸들)의 무게" 양측.
      *핵심 비교 pivot: D(런타임이 다 해줌) vs E'(개발자+표준) vs E(개발자+에뮬) —
      겉보기엔 같은 코루틴 코드라도 구현 부담이 어디에 있는가.*
-6. **Phase 4 — 발표 산출물**: `README.md` 데모 링크, 아주 간단한 글/슬라이드 노트.
+6. **Phase 3.5 — 지표 보강**: correctness 관측이 끝난 뒤, 비용과 표면 증거를
+   같은 예제 산출물에서 수집한다. 1차 범위는 `main.wasm`/`main.js` 크기,
+   Playwright load-to-completion 시간, 대표 실패 케이스의 pageerror/stack 표면이다.
+   결과는 `docs/metrics.md`에 표로 기록하고, `docs/findings.md`에는 해석만 짧게
+   연결한다. 성능 수치는 브라우저/머신 영향이 크므로 절대값보다 target 간 상대 비교와
+   반복 가능한 수집 명령을 우선한다.
+7. **Phase 4 — 발표 산출물**: `README.md` 데모 링크, 아주 간단한 글/슬라이드 노트.
 
 ---
 

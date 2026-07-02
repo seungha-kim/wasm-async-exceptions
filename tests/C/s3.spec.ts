@@ -19,7 +19,7 @@ test('C/S3: suspended Promise rejects — observed console sequence', async ({ p
       (window as any).__Controlled.reject('s3-1', new Error('S3'));
       return 'rejected';
     } catch (e) {
-      return `[control-error] ${e?.message ?? e}`;
+      return `[control-error] ${e instanceof Error ? e.message : String(e)}`;
     }
   });
   if (rejectResult !== 'rejected') lines.push(rejectResult);

@@ -19,7 +19,7 @@ test('D/S2: suspend then throw — observed console sequence', async ({ page }) 
       (window as any).__Controlled.resolve('s2-1');
       return 'resolved';
     } catch (e) {
-      return `[control-error] ${e?.message ?? e}`;
+      return `[control-error] ${e instanceof Error ? e.message : String(e)}`;
     }
   });
   if (resolveResult !== 'resolved') lines.push(resolveResult);
