@@ -650,18 +650,72 @@ destructor and still corrupt the Asyncify + Wasm EH unwind path.
 
 ### S12 — exception_ptr stored, suspend, rethrow_exception
 
+Shape:
+
+```cpp
+std::exception_ptr saved;
+
+try {
+  await_controlled_promise("s12-1");
+  throw std::runtime_error("S12");
+} catch (...) {
+  saved = std::current_exception();
+}
+
+await_controlled_promise("s12-2");
+
+try {
+  std::rethrow_exception(saved);
+} catch (const std::exception& e) {
+  ...
+}
+```
+
 Observed:
 
 - A: passes.
-- B: resumes from `s12-2`, then reports `[pageerror] null function`,
-  `[pageerror] unreachable`, and never logs `PASS:s12-done`.
+- B: logs `S12:after-second-resume`, then reports `[pageerror] null
+  function`, `[pageerror] unreachable`, and never logs `PASS:s12-done`.
 - D: passes.
 
-Mapping: This widens the failure boundary beyond an active catch frame. S12
-leaves the catch block before the second suspend, but it carries a
-`std::exception_ptr` captured from Wasm EH state across that suspend and later
-reactivates it with `std::rethrow_exception`. That captured exception state is
-also unsafe on B.
+Mapping: This is the most interesting Phase 4 boundary case. Unlike S5/S9,
+the second suspend does **not** happen while a catch handler is active. Unlike
+S6/S10, it does **not** happen while C++ stack unwinding is active. The catch
+block has already ended before `s12-2` suspends.
+
+What crosses the suspend boundary is not a live catch/unwind frame, but a
+captured exception handle. `std::current_exception()` does not merely copy the
+exception message. It preserves the currently handled exception in a form that
+the C++ runtime can later throw again. `std::rethrow_exception(saved)` then
+reactivates that saved exception and routes it back through the C++ exception
+machinery.
+
+The B trace narrows the failure point:
+
+```text
+S12:before-first-suspend
+S12:after-first-resume
+PASS:s12-catch-stored
+S12:before-second-suspend
+S12:after-second-resume
+[pageerror] null function
+[pageerror] unreachable
+[timeout] no PASS:s12-done
+```
+
+So B successfully performs the second Asyncify suspend/resume after leaving
+the catch block. The runtime fails only when the saved exception is reactivated
+by `std::rethrow_exception(saved)`. This suggests the unsafe state is broader
+than "an active Wasm EH catch frame crossed an Asyncify boundary": a
+`std::exception_ptr` captured from Wasm EH state can also become invalid or
+incompatible after crossing that boundary.
+
+S12 therefore splits the Phase 4 failure model into two related categories:
+
+- **Live exception state crossing suspend**: S5/S9 carry active catch state;
+  S6/S10 carry active unwind state.
+- **Captured exception state crossing suspend**: S12 carries an
+  `std::exception_ptr` across suspend and fails when rethrowing it later.
 
 ### S14 — repeated normal resolved suspends, then throw
 
@@ -686,6 +740,9 @@ They do establish a narrower correctness distinction:
 - Asyncify + Wasm EH (B) fails C++-initiated exception/suspend stress paths
   even with no rejected JS Promise, but only for shapes where live or captured
   Wasm EH exception state crosses suspend.
+- S12 is the clearest evidence for the captured-state half of that statement:
+  the catch has ended before the failing suspend boundary, but the saved
+  `std::exception_ptr` is later reactivated and B fails at that point.
 - JSPI + Wasm EH (D) passes the same paths.
 - Asyncify + JS EH (A) also passes these particular paths, so it remains a
   stronger practical baseline than expected for C++-initiated exceptions after
