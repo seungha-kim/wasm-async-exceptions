@@ -33,6 +33,8 @@ npm test
 scripts/collect-size-metrics.sh
 ```
 
+예제 빌드는 루트 `CMakeLists.txt`가 정의하며, 각 `examples/<target>/<scenario>/build.sh`는 해당 CMake target을 호출하는 wrapper다.
+
 각 예제는 자체 `EXPECT.md`에 예상/실제 결과와 원인 한 단락 설명을 둔다.
 
 ## 문서
