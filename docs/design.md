@@ -355,7 +355,8 @@ learn-asyncify/
   프레임 안의 예외 상태/소멸자 unwind 경로가 Wasm EH에서 올바로 잡히는지)를 별도
   smoke-test로 검증한다.
 - **Emscripten 버전 drift**: `scripts/toolchain.sh`가 emsdk commit 고정; 예제 빌드
-  스크립트에 `emcc --version`을 찍어 산출물 보존.
+  스크립트에 `emcc --version`을 찍어 산출물 보존. Phase 4 이후 emsdk 4.0.23으로도
+  전체 매트릭스를 재빌드/재실행했고, 6.0.1과 동일한 pass/fail 패턴을 확인했다.
 - **Asyncify + Wasm EH 중간 경로의 취약성**: Emscripten은 `ASYNCIFY=1`과
   `-fwasm-exceptions` 혼용에 대해 경고한다. S5-S7/S9/S10/S12 관측상 이 조합은 JS
   rejection 없이도 C++ exception/suspend stress에서 실패한다. S8/S14 관측상 단순

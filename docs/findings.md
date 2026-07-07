@@ -17,7 +17,9 @@ The completed matrix gives a sharper answer:
   harness: resolution-only C++ exception stress scenarios S5-S7/S9/S10/S12
   fail on B while A and D pass. S8/S14 narrow the failure boundary: B can still
   catch a C++ throw after ordinary resolved yields, but fails when live or
-  captured Wasm EH exception state must cross a suspend boundary.
+  captured Wasm EH exception state must cross a suspend boundary. The same
+  pass/fail pattern was reproduced with emsdk 4.0.23 as a toolchain
+  cross-check, not only with the repository's pinned 6.0.1 toolchain.
 - C++20 coroutine glue works for all four scenarios because it treats JS
   settlement as data, resumes C++, and throws from C++ in `await_resume()`.
 
@@ -749,3 +751,30 @@ They do establish a narrower correctness distinction:
   resolved async work.
 - S8 and S14 pass on B, which rules out the broader explanation that deep or
   repeated multi-yield call chains by themselves break outer C++ catch.
+
+### Toolchain cross-check — emsdk 4.0.23
+
+The full matrix was also rebuilt and rerun with emsdk 4.0.23:
+
+```text
+emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 4.0.23
+```
+
+The command used the repo-local `./emsdk` environment, rebuilt the examples via
+`npm test`, and completed with:
+
+```text
+59 passed (2.9m)
+```
+
+The observed behavior matched the 6.0.1 run: B still failed
+S5-S7/S9/S10/S12 with the expected `null function` / `unreachable` surfaces,
+while B/S8 and B/S14 still passed. S12 also reproduced the same captured-state
+boundary: B reached `S12:after-second-resume` and then failed while reactivating
+the saved exception, while D/S12 passed.
+
+For JSPI imports, no source change was required. The project already supplies
+`-sASYNCIFY_IMPORTS=['jsAwaitControlledPromise']` for A-D. In generated 4.0.23
+JSPI output, that list was used to build an import pattern and wrap matching
+imports with `WebAssembly.Suspending`, including `jsAwaitControlledPromise` and
+the `EM_ASYNC_JS`-generated `__asyncjs__js_await_controlled_promise`.
