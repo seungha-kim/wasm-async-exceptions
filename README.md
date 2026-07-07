@@ -49,7 +49,7 @@ scripts/collect-size-metrics.sh
 1. 결론: [`docs/findings.md`](docs/findings.md)
 2. 관측 결과 매트릭스: [`docs/matrix.md`](docs/matrix.md)
 3. 정량 지표: [`docs/metrics.md`](docs/metrics.md)
-4. 발표/글 초안: [`docs/presentation.md`](docs/presentation.md)
+4. 글 초안: [`docs/presentation.md`](docs/presentation.md)
 5. 설계: [`docs/design.md`](docs/design.md)
 6. 배경(Wasm 런타임 한계 + Emscripten 에뮬레이션): [`docs/background.md`](docs/background.md)
 

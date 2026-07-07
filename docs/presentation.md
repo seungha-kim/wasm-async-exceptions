@@ -1,161 +1,234 @@
-# Presentation Notes
+# Asyncify, JSPI, Wasm EH, and C++ Exceptions Across an Async Boundary
 
-## Title
+## Thesis
 
-Asyncify, JSPI, Wasm EH, and the boundary between JavaScript async work and
-C++ exceptions.
+Rejected JavaScript Promises do not automatically become C++ exceptions at the
+Wasm boundary. If C++ `catch` semantics matter after JS async work, the
+settlement needs to cross the boundary as data, and C++ needs to decide whether
+to throw after it resumes.
 
-## One-sentence thesis
+The later stress tests add a second, more specific migration finding:
+`Asyncify + Wasm EH` is not a safe halfway path. It passes ordinary
+multi-yield-then-throw paths, but fails when live or captured Wasm EH exception
+state crosses an Asyncify suspend boundary.
 
-Rejected JS Promises do not automatically become C++ exceptions; if C++
-`catch` semantics matter, JS async settlement must be converted into C++
-control flow explicitly. Separately, Asyncify + Wasm EH is a fragile
-intermediate migration target: it fails C++-initiated exception/suspend stress
-cases that both Asyncify + JS EH and JSPI + Wasm EH handle.
+## Why this is tricky in Wasm
 
-## 10-minute outline
+Wasm did not originally provide the two runtime behaviors that this project
+intentionally mixes:
 
-### 1. Problem
+- saving and restoring a suspended stack while JavaScript async work completes;
+- carrying C++ exception semantics through generated Wasm and JS support.
 
-WebAssembly did not start with native stack suspension or C++ exceptions.
-Emscripten fills those gaps with runtime support:
+Emscripten can emulate those behaviors. Asyncify rewrites code so a Wasm stack
+can be unwound and rewound. JS exception emulation represents C++ exception
+state with generated JavaScript support. JSPI and Wasm exception handling move
+parts of that work into standardized runtime mechanisms.
 
-- Asyncify rewrites code so a Wasm stack can be saved and restored.
-- JS exception emulation carries C++ exception state through generated JS
-  support.
-- JSPI and Wasm EH move parts of this work into standardized runtime
-  mechanisms.
+That gives us several plausible migration paths. The question is not simply
+"does C++ throw still work?" It does, in many cases. The interesting boundary is
+what happens when JavaScript async settlement and C++ exception semantics meet.
 
-The risky boundary is not "throw in C++ after an await"; that can work. The
-risky boundary is "a JavaScript Promise rejects while Wasm is suspended."
+## Experiment setup
 
-### 2. Experiment
+The first matrix tests six targets:
 
-The project tests six targets:
-
-| Target | Coroutine axis | Exception axis |
+| Target | Stack/async axis | Exception axis |
 |---|---|---|
-| A | Asyncify | JS EH |
+| A | Asyncify | JS exception emulation |
 | B | Asyncify | Wasm EH |
-| C | JSPI | JS EH |
+| C | JSPI | JS exception emulation |
 | D | JSPI | Wasm EH |
-| E | C++20 coroutine glue | JS EH |
+| E | C++20 coroutine glue | JS exception emulation |
 | E' | C++20 coroutine glue | Wasm EH |
 
-Each target runs four scenarios:
+Each target runs four basic scenarios:
 
-- S1: synchronous throw baseline
-- S2: suspend, resume, then throw from C++
+- S1: synchronous C++ throw baseline
+- S2: suspend, resolve, resume, then throw from C++
 - S3: suspended async operation rejects
-- S4: catch, then await again
+- S4: catch a failed async operation, then await again
 
-A second A/B/D-only stress set removes JS rejection entirely:
+The detailed result matrix lives in [`docs/matrix.md`](matrix.md). The
+phase-by-phase evidence lives in [`docs/findings.md`](findings.md).
 
-- S5: C++ throw, catch, then suspend inside the catch
-- S6: destructor suspends during C++ exception unwind
-- S7: catch, suspend, then rethrow
-- S8: multi-yield call chain, inner C++ throw, outer catch
-- S9/S10: helper-chain variants of catch/destructor suspend
-- S12: `exception_ptr`, suspend, `rethrow_exception`
-- S14: repeated normal suspend/resume, then throw
+## First finding: a rejected Promise is not a C++ exception
 
-### 3. Key observations
+S2 passes on A, B, and D. After the controlled Promise resolves, C++ resumes
+and throws from C++ code. That throw is handled by C++ exception machinery.
 
-S2 passes on A/B/D because the throw originates from C++ after a successful
-resume. That path uses C++ exception machinery.
+S3 and S4 fail on A, B, and D for a different reason. The failure originates as
+a rejected JavaScript Promise while Wasm is suspended. That rejection surfaces
+as a JavaScript page error instead of entering the C++ `catch`.
 
-S3/S4 fail on A/B/D because the throw originates as a rejected JS Promise.
-The rejection escapes as a page error instead of landing in C++ `catch`.
+That distinction is the first practical rule:
 
-C fails in this harness because JSPI plus JS exception emulation hits the
-`trying to suspend JS frames` failure surface.
+> A C++ throw after a successful async resume is not the same thing as a
+> rejected Promise crossing into C++ as an exception.
 
-E/E' pass all scenarios because they do not rely on Promise rejection crossing
-the Wasm boundary. JS records settlement, resumes the coroutine handle, and
-C++ throws from `await_resume()` if the settlement was rejected.
+Switching from Asyncify to JSPI, from JS exception emulation to Wasm EH, or to
+both standardized axes does not by itself define that semantic bridge.
 
-The resolution-only stress set gives a separate migration finding: A and D pass
-all stress scenarios. B fails S5-S7/S9/S10/S12 with `null function` /
-`unreachable`, but passes S8/S14. That means "turn on Wasm EH but keep
-Asyncify" is not a safe intermediate path for code that carries live or
-captured Wasm EH exception state across suspend.
+## The explicit-settlement pattern
 
-### 4. Metrics
+Targets E and E' use a different shape. Instead of relying on an imported
+Promise rejection to become a C++ exception, JavaScript records async settlement
+as data and resumes a C++20 coroutine. The coroutine's `await_resume()` then
+decides whether to return a value or throw from C++.
 
-The metrics reinforce the control-flow finding:
+Conceptually, the bridge looks like this:
 
-- Asyncify rows have the largest combined generated-code footprint in suspend
-  scenarios.
-- JSPI rows reduce generated code but do not solve the rejected-Promise
-  boundary on their own.
-- C++20 coroutine rows add developer-owned glue, but avoid the failure-timeout
-  path in S3/S4.
-- B's S5-S7/S9/S10/S12 failures are correctness failures, not timing artifacts; the long
-  duration is the test waiting for a `PASS:*done` line that never arrives.
-- B/S8 and B/S14 passing narrow the failure boundary: the issue is not simply
-  deep or repeated normal-yield restoration.
+```text
+JS async work settles
+  -> JS stores { status, value_or_error }
+  -> JS resumes C++ coroutine
+  -> C++ await_resume() inspects status
+  -> C++ throws if C++ catch semantics are required
+```
 
-### 5. Recommended pattern
+That pattern passes S1-S4 on both E and E'. The important part is not merely
+"use C++20 coroutines." The important part is ownership of the boundary: JS
+settlement is data, and C++ exception control flow starts from C++ code.
 
-Use explicit async result transport at the JS/Wasm boundary:
+## Second finding: Asyncify + Wasm EH is a fragile halfway path
 
-1. JS resolves/rejects work into a status/result record.
-2. Wasm/C++ is resumed intentionally.
-3. C++ inspects the status.
-4. C++ throws from C++ code if `catch` semantics are required.
+The first matrix did not produce the originally hoped-for story that
+`Asyncify + JS EH` fails while `JSPI + Wasm EH` simply fixes the problem. A
+more interesting issue appeared after removing JS Promise rejection from the
+experiment entirely.
 
-Do not design APIs around the assumption that a rejected Promise will be
-observed as a C++ exception.
+The resolution-only stress scenarios S5-S10/S12/S14 run only on A, B, and D.
+Every controlled Promise resolves. Every exception originates in C++. This
+isolates C++ exception state interacting with suspend/resume.
 
-### 6. Closing line
+The result is:
 
-JSPI and Wasm EH are valuable because they reduce runtime emulation and code
-size, but they are not a substitute for a deliberate exception boundary
-between JavaScript async settlement and C++ control flow. When adopting Wasm
-EH, avoid treating Asyncify + Wasm EH as a low-risk halfway house; test the
-combined exception/suspend paths or move the stack-switching axis too.
+- A (`Asyncify + JS EH`) passes S5-S10/S12/S14.
+- D (`JSPI + Wasm EH`) passes S5-S10/S12/S14.
+- B (`Asyncify + Wasm EH`) fails S5-S7/S9/S10/S12 with `null function` and
+  `unreachable`, but passes S8/S14.
 
-## Demo commands
+So the unsafe migration path is specifically "turn on Wasm EH while keeping
+Asyncify" for code that mixes exceptions with suspension.
+
+## The boundary: live versus captured exception state
+
+B passing S8 and S14 is just as important as B failing S5-S7/S9/S10/S12.
+
+S8 and S14 suspend and resume through ordinary call frames first, then throw a
+new C++ exception later. B handles those paths. That rules out the broad claim
+that "many yields before a throw" is enough to break Asyncify + Wasm EH.
+
+The failing scenarios carry exception state across the suspend boundary:
+
+- S5 and S9 keep catch state live while a suspend happens.
+- S6 and S10 suspend during C++ unwinding from a destructor path.
+- S7 suspends from a catch path that later rethrows.
+- S12 carries a saved `std::exception_ptr` across suspend and reactivates it
+  later.
+
+The narrower rule is:
+
+> B fails when live or captured Wasm EH exception state must survive an
+> Asyncify suspend/resume boundary.
+
+## Why S12 matters
+
+S12 is the edge case that makes the conclusion sharper.
+
+```cpp
+std::exception_ptr saved;
+
+try {
+  await_controlled_promise("s12-1");
+  throw std::runtime_error("S12");
+} catch (...) {
+  saved = std::current_exception();
+}
+
+await_controlled_promise("s12-2");
+
+try {
+  std::rethrow_exception(saved);
+} catch (const std::exception& e) {
+  ...
+}
+```
+
+The second suspend does not happen inside a catch block. It does not happen
+during active stack unwinding. The catch has already ended.
+
+But `std::exception_ptr` is not just a copied message. It is a handle to a
+captured exception that the C++ runtime can later reactivate with
+`std::rethrow_exception`. On B, the trace reaches `S12:after-second-resume` and
+then fails with `null function` / `unreachable` before `PASS:s12-done`.
+
+That means the unsafe state is broader than an active catch frame crossing the
+boundary. Captured Wasm EH exception state can also become unusable after an
+Asyncify suspend/resume.
+
+## What to take away
+
+There are two separate lessons.
+
+First, JavaScript async failure and C++ exception handling are not the same
+control-flow system. Treat JS Promise settlement as data at the boundary, then
+throw from C++ if C++ `catch` is the desired abstraction.
+
+Second, Wasm EH is not a drop-in safety upgrade if the stack-switching axis
+remains Asyncify. In this harness, `Asyncify + Wasm EH` is worse than either
+`Asyncify + JS EH` or `JSPI + Wasm EH` for the C++-initiated stress cases where
+exception state crosses suspend.
+
+JSPI and Wasm EH are still valuable. They reduce emulation and generated-code
+costs. But the migration path needs to move the exception axis and the
+stack-switching axis with care, and the async/exception boundary still needs to
+be explicit.
+
+## Reproducing the observations
+
+Run the full suite:
 
 ```sh
 source ./emsdk/emsdk_env.sh
-npx playwright test --workers=1
+npm test
+```
+
+Run size metrics:
+
+```sh
 scripts/collect-size-metrics.sh
 ```
 
-Representative manual demo:
+Representative rejected-Promise pitfall:
 
 ```sh
 cd examples/A/s3
-./build.sh
 ./run.sh
 ```
 
-Expected takeaway: A/S3 logs `S3:before-suspend` and then a page error
-surface, not a C++ catch.
+Expected takeaway: A/S3 logs `S3:before-suspend`, then the rejected Promise
+escapes as a page error instead of reaching the C++ catch.
 
-Counterexample with explicit settlement conversion:
+Representative explicit-settlement counterexample:
 
 ```sh
 cd examples/E/s3
-./build.sh
 ./run.sh
 ```
 
 Expected takeaway: E/S3 reaches `PASS:s3-catch-reached` because C++ throws
 after coroutine resume.
 
-Migration stress demo:
+Representative migration stress case:
 
 ```sh
-cd examples/B/s6
-./build.sh
+cd examples/B/s12
 ./run.sh
 
-cd ../../D/s6
-./build.sh
+cd ../../D/s12
 ./run.sh
 ```
 
-Expected takeaway: B/S6 reaches destructor resume and then fails with
-`null function` / `unreachable`; D/S6 reaches `PASS:s6-done`.
+Expected takeaway: B/S12 resumes from the second suspend and then fails while
+reactivating the saved exception; D/S12 reaches `PASS:s12-done`.
