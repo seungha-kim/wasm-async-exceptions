@@ -67,9 +67,12 @@ test('CMake defines the full experiment matrix', () => {
   expect(cmake).toContain('project(learn_asyncify_examples LANGUAGES CXX)');
   expect(cmake).toContain('add_experiment_example(A s1)');
   expect(cmake).toContain('add_experiment_example(A s8)');
+  expect(cmake).toContain('add_experiment_example(A s14)');
   expect(cmake).toContain('add_experiment_example(B s8)');
+  expect(cmake).toContain('add_experiment_example(B s12)');
   expect(cmake).toContain('add_experiment_example(D s4)');
   expect(cmake).toContain('add_experiment_example(D s8)');
+  expect(cmake).toContain('add_experiment_example(D s14)');
   expect(cmake).toContain('add_experiment_example(Ep s3)');
 });
 

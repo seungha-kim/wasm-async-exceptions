@@ -55,6 +55,9 @@ A second A/B/D-only stress set removes JS rejection entirely:
 - S6: destructor suspends during C++ exception unwind
 - S7: catch, suspend, then rethrow
 - S8: multi-yield call chain, inner C++ throw, outer catch
+- S9/S10: helper-chain variants of catch/destructor suspend
+- S12: `exception_ptr`, suspend, `rethrow_exception`
+- S14: repeated normal suspend/resume, then throw
 
 ### 3. Key observations
 
@@ -71,10 +74,11 @@ E/E' pass all scenarios because they do not rely on Promise rejection crossing
 the Wasm boundary. JS records settlement, resumes the coroutine handle, and
 C++ throws from `await_resume()` if the settlement was rejected.
 
-The resolution-only S5-S8 stress set gives a separate migration finding:
-A and D pass all four. B fails S5-S7 with `null function` / `unreachable`, but
-passes S8. That means "turn on Wasm EH but keep Asyncify" is not a safe
-intermediate path for code that suspends while C++ exception state is live.
+The resolution-only stress set gives a separate migration finding: A and D pass
+all stress scenarios. B fails S5-S7/S9/S10/S12 with `null function` /
+`unreachable`, but passes S8/S14. That means "turn on Wasm EH but keep
+Asyncify" is not a safe intermediate path for code that carries live or
+captured Wasm EH exception state across suspend.
 
 ### 4. Metrics
 
@@ -86,10 +90,10 @@ The metrics reinforce the control-flow finding:
   boundary on their own.
 - C++20 coroutine rows add developer-owned glue, but avoid the failure-timeout
   path in S3/S4.
-- B's S5-S7 failures are correctness failures, not timing artifacts; the long
+- B's S5-S7/S9/S10/S12 failures are correctness failures, not timing artifacts; the long
   duration is the test waiting for a `PASS:*done` line that never arrives.
-- B/S8 passing narrows the failure boundary: the issue is not simply deep
-  multi-yield call-chain restoration.
+- B/S8 and B/S14 passing narrow the failure boundary: the issue is not simply
+  deep or repeated normal-yield restoration.
 
 ### 5. Recommended pattern
 

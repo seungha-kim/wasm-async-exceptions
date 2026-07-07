@@ -1,0 +1,10 @@
+S9:before-first-suspend
+S9:after-first-resume
+PASS:s9-catch-reached
+S9
+S9:helper1-enter
+S9:helper-before-suspend
+PASS:s9-helper-after-resume
+S9:helper1-exit
+PASS:s9-after-helper
+PASS:s9-done

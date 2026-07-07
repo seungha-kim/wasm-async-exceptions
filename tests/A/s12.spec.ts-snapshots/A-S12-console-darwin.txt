@@ -1,0 +1,8 @@
+S12:before-first-suspend
+S12:after-first-resume
+PASS:s12-catch-stored
+S12:before-second-suspend
+S12:after-second-resume
+PASS:s12-rethrow-catch-reached
+S12
+PASS:s12-done
