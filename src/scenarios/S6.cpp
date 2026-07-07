@@ -6,6 +6,8 @@ namespace {
 struct CleanupSuspend {
   ~CleanupSuspend() {
     scenario_log("S6:dtor-before-suspend");
+    // Key stress point: suspend while C++ exception unwinding is running
+    // this destructor. Observed: A passes, B fails after resume, D passes.
     await_controlled_promise("s6-cleanup");
     scenario_log("PASS:s6-dtor-after-resume");
   }

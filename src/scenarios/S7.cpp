@@ -11,6 +11,8 @@ int main() {
     } catch (const std::exception& e) {
       scenario_log("S7:inner-catch");
       scenario_log(e.what());
+      // Key stress point: suspend while an exception is saved for rethrow.
+      // Observed: A passes, B fails after resume, D passes.
       await_controlled_promise("s7-2");
       scenario_log("S7:after-inner-resume");
       throw;
