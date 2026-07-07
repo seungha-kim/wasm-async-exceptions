@@ -70,6 +70,19 @@ scripts/collect-size-metrics.sh
 C++ throw/catch/unwind와 suspend만 섞는다. 관측 결과 S5-S7은 A/D 통과, B 실패이고,
 S8은 A/B/D 모두 통과다.
 
+## 시나리오 요약
+
+| Scenario | 대상 | 핵심 질문 |
+|---|---|---|
+| S1 | A/B/C/D/E/E' | suspend 없이 동기 C++ `throw`가 같은 함수의 `catch`에 잡히는 baseline인가? |
+| S2 | A/B/C/D/E/E' | Promise resolve로 resume된 뒤 C++에서 직접 던진 예외가 `catch`에 잡히는가? |
+| S3 | A/B/C/D/E/E' | suspended Promise rejection이 C++ `catch`로 들어오는가, 아니면 JS pageerror로 새는가? |
+| S4 | A/B/C/D/E/E' | 첫 await rejection을 catch한 뒤 다시 await하는 staged recovery가 가능한가? |
+| S5 | A/B/D | C++ throw를 catch한 상태에서 catch 블록 안 suspend/resume이 가능한가? |
+| S6 | A/B/D | C++ exception unwind 중 destructor가 suspend/resume해도 unwinding이 유지되는가? |
+| S7 | A/B/D | inner catch에서 suspend한 뒤 `throw;` rethrow가 outer catch까지 도달하는가? |
+| S8 | A/B/D | 여러 단계 호출 체인에서 각 단계가 yield한 뒤 innermost C++ throw가 outer catch까지 도달하는가? |
+
 ## 진행 상태
 
 완료된 실험:
