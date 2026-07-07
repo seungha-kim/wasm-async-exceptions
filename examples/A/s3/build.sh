@@ -1,25 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
 cd "$(dirname "$0")"
-mkdir -p build
+ROOT="$(cd ../../.. && pwd)"
+BUILD_DIR="${BUILD_DIR:-$ROOT/cmake-build-emscripten}"
 
-emcc \
-  -std=c++17 \
-  -O1 \
-  -sASYNCIFY=1 \
-  -sASYNCIFY_IMPORTS=['jsAwaitControlledPromise'] \
-  -sDISABLE_EXCEPTION_CATCHING=0 \
-  -sMODULARIZE=1 \
-  -sEXPORT_NAME=createModule \
-  -sEXPORT_ES6=1 \
-  -sEXPORTED_FUNCTIONS=['_main'] \
-  -sEXPORTED_RUNTIME_METHODS=['HEAP8'] \
-  -sALLOW_MEMORY_GROWTH=1 \
-  -I ../../../src \
-  ../../../src/runtime_helpers.cpp \
-  ../../../src/scenarios/S3.cpp \
-  -o build/main.js
-
-cp ../../../src/page_template.html build/index.html
-cp ../../../src/test_harness.js   build/test_harness.js
+emcmake cmake -S "$ROOT" -B "$BUILD_DIR"
+cmake --build "$BUILD_DIR" --target example_A_s3
 echo "built: $(pwd)/build/main.js"

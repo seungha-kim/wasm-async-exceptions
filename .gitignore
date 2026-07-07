@@ -1,6 +1,8 @@
 node_modules/
 examples/*/*/build/
+cmake-build-emscripten/
 emsdk/
 .upstream/
 *.wasm.o
-.DS_Storetest-results/
+.DS_Store
+test-results/
