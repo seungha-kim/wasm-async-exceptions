@@ -12,6 +12,10 @@ set(COMMON_EMSCRIPTEN_LINK_FLAGS
   "-sALLOW_MEMORY_GROWTH=1"
 )
 
+set(COMMON_EMSCRIPTEN_COMPILE_FLAGS
+  "-O1"
+)
+
 set(ASYNC_RUNTIME_LINK_FLAGS
   "-sASYNCIFY_IMPORTS=['jsAwaitControlledPromise']"
   "-sEXPORTED_FUNCTIONS=['_main']"
@@ -23,6 +27,13 @@ set(CORO_RUNTIME_LINK_FLAGS
 
 function(add_link_flags target)
   foreach(flag IN LISTS ARGN)
+    target_link_options(${target} PRIVATE "SHELL:${flag}")
+  endforeach()
+endfunction()
+
+function(add_compile_and_link_flags target)
+  foreach(flag IN LISTS ARGN)
+    target_compile_options(${target} PRIVATE "SHELL:${flag}")
     target_link_options(${target} PRIVATE "SHELL:${flag}")
   endforeach()
 endfunction()
@@ -75,6 +86,7 @@ function(add_experiment_example target_name scenario_name)
   endif()
 
   target_include_directories(${cmake_target} PRIVATE "${CMAKE_SOURCE_DIR}/src")
+  target_compile_options(${cmake_target} PRIVATE ${COMMON_EMSCRIPTEN_COMPILE_FLAGS})
   set_target_properties(${cmake_target} PROPERTIES
     OUTPUT_NAME "main"
     RUNTIME_OUTPUT_DIRECTORY "${output_dir}"
@@ -83,29 +95,37 @@ function(add_experiment_example target_name scenario_name)
   if(target_name STREQUAL "A")
     add_link_flags(${cmake_target}
       "-sASYNCIFY=1"
+    )
+    add_compile_and_link_flags(${cmake_target}
       "-sDISABLE_EXCEPTION_CATCHING=0"
     )
   elseif(target_name STREQUAL "B")
     add_link_flags(${cmake_target}
       "-sASYNCIFY=1"
+    )
+    add_compile_and_link_flags(${cmake_target}
       "-fwasm-exceptions"
     )
   elseif(target_name STREQUAL "C")
     add_link_flags(${cmake_target}
       "-sASYNCIFY=2"
+    )
+    add_compile_and_link_flags(${cmake_target}
       "-sDISABLE_EXCEPTION_CATCHING=0"
     )
   elseif(target_name STREQUAL "D")
     add_link_flags(${cmake_target}
       "-sASYNCIFY=2"
+    )
+    add_compile_and_link_flags(${cmake_target}
       "-fwasm-exceptions"
     )
   elseif(target_name STREQUAL "E")
-    add_link_flags(${cmake_target}
+    add_compile_and_link_flags(${cmake_target}
       "-sDISABLE_EXCEPTION_CATCHING=0"
     )
   elseif(target_name STREQUAL "Ep")
-    add_link_flags(${cmake_target}
+    add_compile_and_link_flags(${cmake_target}
       "-fwasm-exceptions"
     )
   else()
