@@ -97,35 +97,41 @@ The first matrix did not produce the originally hoped-for story that
 more interesting issue appeared after removing JS Promise rejection from the
 experiment entirely.
 
-The resolution-only stress scenarios S5-S10/S12/S14 run only on A, B, and D.
+The resolution-only stress scenarios S5-S17 run only on A, B, and D.
 Every controlled Promise resolves. Every exception originates in C++. This
 isolates C++ exception state interacting with suspend/resume.
 
 The result is:
 
-- A (`Asyncify + JS EH`) passes S5-S10/S12/S14.
-- D (`JSPI + Wasm EH`) passes S5-S10/S12/S14.
-- B (`Asyncify + Wasm EH`) fails S5-S7/S9/S10/S12 with `null function` and
-  `unreachable`, but passes S8/S14.
+- A (`Asyncify + JS EH`) passes S5-S17.
+- D (`JSPI + Wasm EH`) passes S5-S17.
+- B (`Asyncify + Wasm EH`) fails S5-S7/S9-S12 with `null function` and
+  `unreachable`, passes S8/S14/S17, and reaches `PASS:done` but then reports
+  post-done `unreachable` on S13/S15/S16.
 
 So the unsafe migration path is specifically "turn on Wasm EH while keeping
 Asyncify" for code that mixes exceptions with suspension.
 
 ## The boundary: live versus captured exception state
 
-B passing S8 and S14 is just as important as B failing S5-S7/S9/S10/S12.
+B passing S8, S14, and S17 is just as important as B failing S5-S7/S9-S12.
 
 S8 and S14 suspend and resume through ordinary call frames first, then throw a
 new C++ exception later. B handles those paths. That rules out the broad claim
 that "many yields before a throw" is enough to break Asyncify + Wasm EH.
 
-The failing scenarios carry exception state across the suspend boundary:
+The hard-failing scenarios carry exception state across the suspend boundary:
 
 - S5 and S9 keep catch state live while a suspend happens.
 - S6 and S10 suspend during C++ unwinding from a destructor path.
 - S7 suspends from a catch path that later rethrows.
-- S12 carries a saved `std::exception_ptr` across suspend and reactivates it
-  later.
+- S11 and S12 carry a saved `std::exception_ptr` across suspend and reactivate
+  it later.
+
+S13/S15/S16 are payload-only controls. They read the copied object, stable
+pointer, or copied string after suspend and reach `PASS:done`, but B still
+emits a post-done `unreachable`. S17 is the inverse `exception_ptr` control:
+create it after resume, rethrow it before another suspend, and B passes.
 
 The narrower rule is:
 

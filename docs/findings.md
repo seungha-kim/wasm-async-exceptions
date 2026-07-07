@@ -14,12 +14,15 @@ The completed matrix gives a sharper answer:
   some failure surfaces, but it does not by itself define a C++ exception
   boundary for rejected JS Promises.
 - Asyncify + Wasm EH is not a safe intermediate migration path in this
-  harness: resolution-only C++ exception stress scenarios S5-S7/S9/S10/S12
-  fail on B while A and D pass. S8/S14 narrow the failure boundary: B can still
-  catch a C++ throw after ordinary resolved yields, but fails when live or
-  captured Wasm EH exception state must cross a suspend boundary. The same
-  pass/fail pattern was reproduced with emsdk 4.0.23 as a toolchain
-  cross-check, not only with the repository's pinned 6.0.1 toolchain.
+  harness: resolution-only C++ exception stress scenarios S5-S7/S9-S12 fail
+  on B while A and D pass. S8/S14/S17 narrow the failure boundary: B can still
+  catch a C++ throw after ordinary resolved yields, and can use an
+  `exception_ptr` that does not cross a later suspend, but fails when live or
+  captured Wasm EH exception state must cross a suspend boundary. S13/S15/S16
+  reach `PASS:done` but still emit a post-done `unreachable` pageerror on B.
+  The earlier S5-S10/S12/S14 pass/fail pattern was reproduced with emsdk
+  4.0.23 as a toolchain cross-check, not only with the repository's pinned
+  6.0.1 toolchain.
 - C++20 coroutine glue works for all four scenarios because it treats JS
   settlement as data, resumes C++, and throws from C++ in `await_resume()`.
 
@@ -33,10 +36,10 @@ The practical rule is therefore:
 
 | Target | Result | Interpretation |
 |---|---|---|
-| A — Asyncify + JS EH | S2 and S5-S10/S12/S14 pass; S3/S4 fail | C++-initiated exception/suspend paths work; JS rejection escapes. |
-| B — Asyncify + Wasm EH | S1/S2/S8/S14 pass; S3/S4 and S5-S7/S9/S10/S12 fail | Wasm EH does not make rejected JS Promises catchable; this mix fails when live/captured exception state crosses suspend. |
+| A — Asyncify + JS EH | S2 and S5-S17 pass; S3/S4 fail | C++-initiated exception/suspend paths work; JS rejection escapes. |
+| B — Asyncify + Wasm EH | S1/S2/S8/S14/S17 pass; S3/S4 and S5-S7/S9-S12 fail; S13/S15/S16 warn | Wasm EH does not make rejected JS Promises catchable; this mix fails when live/captured exception state crosses suspend and can still trap after payload-only controls. |
 | C — JSPI + JS EH | all scenarios fail in this harness | JS EH remains incompatible with this JSPI frame shape. |
-| D — JSPI + Wasm EH | S1/S2 and S5-S10/S12/S14 pass; S3/S4 fail | Runtime standards handle C++-initiated stress paths, but JS rejection still escapes. |
+| D — JSPI + Wasm EH | S1/S2 and S5-S17 pass; S3/S4 fail | Runtime standards handle C++-initiated stress paths, but JS rejection still escapes. |
 | E — C++20 coroutine + JS EH | all scenarios pass | Developer-owned settlement conversion restores C++ control flow. |
 | E' — C++20 coroutine + Wasm EH | all scenarios pass | Same behavioral result as E; Wasm EH mainly changes generated code shape. |
 
@@ -49,11 +52,13 @@ representative pageerror surfaces. The short version:
   scenarios.
 - JSPI rows C/D reduce generated code size but still need an explicit
   settlement boundary for JS rejection.
-- B's S5-S7/S9/S10/S12 failures show that "turn on Wasm EH while staying on Asyncify" is
+- B's S5-S7/S9-S12 failures show that "turn on Wasm EH while staying on Asyncify" is
   not just an incomplete fix for JS rejection; it can introduce failures when
-  C++ exception state remains active or captured across suspend. B/S8 and B/S14
-  passing narrow the claim: ordinary multi-yield restoration followed by a C++
-  throw can still work.
+  C++ exception state remains active or captured across suspend. B/S13/S15/S16
+  add a post-done trap warning even when only copied payload data crosses the
+  suspend. B/S8, B/S14, and B/S17 passing narrow the claim: ordinary
+  multi-yield restoration followed by a C++ throw, or local `exception_ptr`
+  use after resume, can still work.
 - E/E' avoid failure-timeout paths in S3/S4 because the rejected async
   settlement is converted into a C++ throw after coroutine resume.
 
@@ -426,11 +431,12 @@ only sees exceptions thrown from inside Wasm/C++ control flow.
   catchable exception. Test that path explicitly.
 - Prefer resolving async imports with a status/result value and throwing from
   C++ after resume if C++ catch semantics are required.
-- Do not treat Asyncify + Wasm EH as a safe halfway migration step. S5-S7/S9/S10/S12 show
+- Do not treat Asyncify + Wasm EH as a safe halfway migration step. S5-S7/S9-S12 show
   B failing resolution-only C++ exception/suspend stress paths that A and D
-  pass. S8/S14 also show the boundary is not "any throw after several yields";
+  pass. S8/S14/S17 also show the boundary is not "any throw after several yields";
   the failing shape involves live or captured Wasm EH exception state crossing
-  a suspend.
+  a suspend. S13/S15/S16 additionally show post-done traps after payload-only
+  controls.
 - Keep Playwright coverage for both resolution and rejection paths; S2 passing
   does not imply S3/S4 are safe.
 - Treat JSPI support as experimental in Emscripten 6.0.1 and pin the toolchain
@@ -549,7 +555,7 @@ chooses whether to throw after resume."
 
 ## Phase 4 — Resolution-only C++ exception stress tests
 
-S5-S10/S12/S14 were added to test a narrower claim: can we find code that fails on an
+S5-S17 were added to test a narrower claim: can we find code that fails on an
 Asyncify row but passes on JSPI + Wasm EH without relying on rejected JS
 Promises? These scenarios use only resolved controlled Promises; every
 exception originates in C++.
@@ -650,6 +656,47 @@ Observed:
 Mapping: This extends S6. The suspend can be one helper call below the
 destructor and still corrupt the Asyncify + Wasm EH unwind path.
 
+### S11 — nested exception_ptr stored, suspend, nested rethrow
+
+Shape:
+
+```cpp
+std::exception_ptr saved;
+
+try {
+  try {
+    await_controlled_promise("s11-1");
+    throw std::runtime_error("S11-inner");
+  } catch (...) {
+    std::throw_with_nested(std::runtime_error("S11-outer"));
+  }
+} catch (...) {
+  saved = std::current_exception();
+}
+
+await_controlled_promise("s11-2");
+
+try {
+  std::rethrow_exception(saved);
+} catch (const std::exception& e) {
+  std::rethrow_if_nested(e);
+}
+```
+
+Observed:
+
+- A: passes and logs both `S11-outer` and `S11-inner`.
+- B: logs `S11:after-second-resume`, then reports `[pageerror] null
+  function`, `[pageerror] unreachable`, and never logs `PASS:s11-done`.
+- D: passes and logs both `S11-outer` and `S11-inner`.
+
+Mapping: S11 behaves like S12 with a richer captured payload. The nested
+exception machinery itself is not the interesting failure point: A and D can
+rethrow the saved outer exception and then recover the nested inner exception.
+B fails before it reaches `PASS:s11-outer-rethrow-catch-reached`, so the
+failure is still at captured exception state reactivation after crossing an
+Asyncify suspend.
+
 ### S12 — exception_ptr stored, suspend, rethrow_exception
 
 Shape:
@@ -716,8 +763,40 @@ S12 therefore splits the Phase 4 failure model into two related categories:
 
 - **Live exception state crossing suspend**: S5/S9 carry active catch state;
   S6/S10 carry active unwind state.
-- **Captured exception state crossing suspend**: S12 carries an
-  `std::exception_ptr` across suspend and fails when rethrowing it later.
+- **Captured exception state crossing suspend**: S11/S12 carry an
+  `std::exception_ptr` across suspend and fail when rethrowing it later.
+
+### S13 — copied exception object, suspend, payload read
+
+Shape:
+
+```cpp
+std::unique_ptr<std::runtime_error> saved;
+
+try {
+  await_controlled_promise("s13-1");
+  throw std::runtime_error("S13");
+} catch (const std::runtime_error& e) {
+  saved = std::make_unique<std::runtime_error>(e);
+}
+
+await_controlled_promise("s13-2");
+scenario_log(saved->what());
+```
+
+Observed:
+
+- A: passes.
+- B: reaches `PASS:s13-copied-object-readable` and `PASS:s13-done`, then
+  reports `[pageerror] unreachable`.
+- D: passes.
+
+Mapping: S13 separates a copied C++ object from C++ exception runtime state.
+The payload copy is readable on B after the suspend, so this is not an S12-like
+captured-state failure. However, B still emits a post-done trap. That suggests
+another, milder failure surface: a function can catch a Wasm EH exception,
+leave the catch, later Asyncify-suspend, and appear to complete, but still
+trap during the generated completion path.
 
 ### S14 — repeated normal resolved suspends, then throw
 
@@ -731,26 +810,78 @@ Mapping: This reinforces S8. More normal suspend/resume points before the C++
 throw do not break B. The failure requires live or captured exception state to
 cross the suspend boundary.
 
+### S15 — stable what pointer, suspend, payload read
+
+Observed:
+
+- A: passes.
+- B: reaches `PASS:s15-pointer-readable` and `PASS:s15-done`, then reports
+  `[pageerror] unreachable`.
+- D: passes.
+
+Mapping: S15 intentionally avoids a dangling `what()` pointer by throwing a
+custom exception whose `what()` returns a string literal. The pointer payload
+survives the suspend on B, but the same post-done trap appears. This reinforces
+that S13's result is not caused by copying a `std::runtime_error` object.
+
+### S16 — copied what string, suspend, payload read
+
+Observed:
+
+- A: passes.
+- B: reaches `PASS:s16-string-readable` and `PASS:s16-done`, then reports
+  `[pageerror] unreachable`.
+- D: passes.
+
+Mapping: S16 is the ordinary `std::string` payload version of S15. It reaches
+the same B outcome: the data crosses the suspend cleanly, but Asyncify + Wasm
+EH still reports a post-done trap after a prior caught exception and later
+suspend in the same function.
+
+### S17 — exception_ptr created after resume and consumed before next suspend
+
+Observed:
+
+- A: passes.
+- B: passes.
+- D: passes.
+
+Mapping: S17 is the control that keeps `std::exception_ptr` entirely on one
+side of the async boundary. It suspends first, resumes, then creates and
+rethows the `exception_ptr` before any later suspend. B passes. Therefore
+`std::exception_ptr` is not inherently broken on Asyncify + Wasm EH; the S11
+and S12 failures require the captured exception state to cross the Asyncify
+suspend boundary before being reactivated.
+
 ### Phase 4 summary
 
 The stress tests do **not** support the original hoped-for claim that
 Asyncify + JS exception emulation fails while JSPI + Wasm EH passes. A passes
-S5-S10/S12/S14.
+S5-S17.
 
 They do establish a narrower correctness distinction:
 
 - Asyncify + Wasm EH (B) fails C++-initiated exception/suspend stress paths
   even with no rejected JS Promise, but only for shapes where live or captured
-  Wasm EH exception state crosses suspend.
-- S12 is the clearest evidence for the captured-state half of that statement:
-  the catch has ended before the failing suspend boundary, but the saved
-  `std::exception_ptr` is later reactivated and B fails at that point.
+  Wasm EH exception state crosses suspend. S11 extends the captured-state
+  case to nested exceptions.
+- S12 remains the clearest minimal evidence for the captured-state half of
+  that statement: the catch has ended before the failing suspend boundary, but
+  the saved `std::exception_ptr` is later reactivated and B fails at that
+  point.
+- S17 shows the inverse control: creating and consuming an `exception_ptr`
+  after resume works on B when the captured exception state does not cross a
+  later suspend.
+- S13/S15/S16 show that ordinary copied payloads can be read after the suspend,
+  but B still emits a post-done `unreachable` after the prior catch and later
+  suspend. These are warnings, not clean passes.
 - JSPI + Wasm EH (D) passes the same paths.
 - Asyncify + JS EH (A) also passes these particular paths, so it remains a
   stronger practical baseline than expected for C++-initiated exceptions after
   resolved async work.
-- S8 and S14 pass on B, which rules out the broader explanation that deep or
-  repeated multi-yield call chains by themselves break outer C++ catch.
+- S8, S14, and S17 pass on B, which rules out the broader explanation that
+  deep/repeated multi-yield call chains or local `exception_ptr` use by
+  themselves break outer C++ catch.
 
 ### Toolchain cross-check — emsdk 4.0.23
 
@@ -767,11 +898,11 @@ The command used the repo-local `./emsdk` environment, rebuilt the examples via
 59 passed (2.9m)
 ```
 
-The observed behavior matched the 6.0.1 run: B still failed
-S5-S7/S9/S10/S12 with the expected `null function` / `unreachable` surfaces,
-while B/S8 and B/S14 still passed. S12 also reproduced the same captured-state
-boundary: B reached `S12:after-second-resume` and then failed while reactivating
-the saved exception, while D/S12 passed.
+The observed behavior matched the 6.0.1 run for the then-current S5-S10/S12/S14
+matrix: B still failed S5-S7/S9/S10/S12 with the expected `null function` /
+`unreachable` surfaces, while B/S8 and B/S14 still passed. S12 also reproduced
+the same captured-state boundary: B reached `S12:after-second-resume` and then
+failed while reactivating the saved exception, while D/S12 passed.
 
 For JSPI imports, no source change was required. The project already supplies
 `-sASYNCIFY_IMPORTS=['jsAwaitControlledPromise']` for A-D. In generated 4.0.23

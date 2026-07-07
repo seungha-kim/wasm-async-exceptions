@@ -1,0 +1,8 @@
+S15:before-first-suspend
+S15:after-first-resume
+PASS:s15-catch-pointer-stored
+S15:before-second-suspend
+S15:after-second-resume
+PASS:s15-pointer-readable
+S15
+PASS:s15-done

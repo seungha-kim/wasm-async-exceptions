@@ -96,11 +96,12 @@ Timing interpretation:
 - Passing rows complete in tens of milliseconds in this harness. The C++20
   coroutine rows E/E' avoid the long timeout path for S3/S4 because rejected
   settlement is converted into C++ control flow by `await_resume()`.
-- S5-S10/S12/S14 are not included in this Phase 3.5 timing table. Their Phase 4
-  snapshots record a different class of observation: S5-S7/S9/S10/S12 show B
+- S5-S17 are not included in this Phase 3.5 timing table. Their Phase 4
+  snapshots record a different class of observation: S5-S7/S9-S12 show B
   (Asyncify + Wasm EH) reaching the C++-initiated stress path and then failing
-  with `null function` / `unreachable`, while S8/S14 show B can still complete
-  repeated normal-yield paths followed by a C++ throw to an outer catch.
+  with `null function` / `unreachable`; S13/S15/S16 reach `PASS:done` and then
+  emit a post-done `unreachable`; S8/S14/S17 show B can still complete normal
+  controls where exception state does not cross a later Asyncify suspend.
 
 ## Representative Error Surfaces
 
@@ -111,8 +112,9 @@ Timing interpretation:
 | D/S3 | `S3` | rejected JS Promise still does not become C++ catchable |
 | D/S4 | `S4` | first rejected await escapes before second await can be driven |
 | B/S5-S7, B/S9-S10 | `null function` / `unreachable` | Asyncify + Wasm EH fails when live exception state crosses suspend |
-| B/S12 | `null function` / `unreachable` | Captured `exception_ptr` state also fails across suspend before rethrow |
-| B/S8, B/S14 | - | Asyncify + Wasm EH can catch C++ throws after repeated normal resolved yields |
+| B/S11-S12 | `null function` / `unreachable` | Captured `exception_ptr` state also fails across suspend before rethrow |
+| B/S13, B/S15-S16 | post-done `unreachable` | Copied payloads are readable, but completion is not clean on Asyncify + Wasm EH |
+| B/S8, B/S14, B/S17 | - | Asyncify + Wasm EH can complete controls where exception state does not cross a later suspend |
 
 The exact browser stack trace is intentionally not recorded here; only the
 stable leading message and class are used for comparison.

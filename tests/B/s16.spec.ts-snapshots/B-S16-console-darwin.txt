@@ -1,0 +1,9 @@
+S16:before-first-suspend
+S16:after-first-resume
+PASS:s16-catch-string-copied
+S16:before-second-suspend
+S16:after-second-resume
+PASS:s16-string-readable
+S16
+PASS:s16-done
+[pageerror] unreachable

@@ -15,7 +15,7 @@ with line-promoted links to the example's `EXPECT.md`. "—" means not yet run.
 
 ## Resolution-only C++ exception stress scenarios
 
-S5-S10/S12/S14 were added after the first matrix to remove JS Promise rejection from
+S5-S17 were added after the first matrix to remove JS Promise rejection from
 the experiment. Every controlled Promise is resolved; failures therefore point
 at C++ exception/suspend interaction rather than JS rejection crossing the
 Wasm boundary.
@@ -41,11 +41,21 @@ Additional edge scenarios refine the S5-S8 boundary further:
 | B      | [FAIL](../examples/B/s9/EXPECT.md) [obs](../tests/B/s9.spec.ts-snapshots/B-S9-console-darwin.txt) `... → PASS:s9-after-helper → [pageerror] null function → [pageerror] unreachable → [timeout] no PASS:s9-done` | [FAIL](../examples/B/s10/EXPECT.md) [obs](../tests/B/s10.spec.ts-snapshots/B-S10-console-darwin.txt) `... → PASS:s10-dtor-after-helper → [pageerror] null function → [pageerror] unreachable → [timeout] no PASS:s10-done` | [FAIL](../examples/B/s12/EXPECT.md) [obs](../tests/B/s12.spec.ts-snapshots/B-S12-console-darwin.txt) `... → S12:after-second-resume → [pageerror] null function → [pageerror] unreachable → [timeout] no PASS:s12-done` | [PASS](../examples/B/s14/EXPECT.md) [obs](../tests/B/s14.spec.ts-snapshots/B-S14-console-darwin.txt) `... → PASS:s14-outer-catch-reached → S14 → PASS:s14-done` |
 | D      | [PASS](../examples/D/s9/EXPECT.md) [obs](../tests/D/s9.spec.ts-snapshots/D-S9-console-darwin.txt) `... → PASS:s9-after-helper → PASS:s9-done` | [PASS](../examples/D/s10/EXPECT.md) [obs](../tests/D/s10.spec.ts-snapshots/D-S10-console-darwin.txt) `... → PASS:s10-dtor-after-helper → PASS:s10-catch-reached → PASS:s10-done` | [PASS](../examples/D/s12/EXPECT.md) [obs](../tests/D/s12.spec.ts-snapshots/D-S12-console-darwin.txt) `... → PASS:s12-rethrow-catch-reached → S12 → PASS:s12-done` | [PASS](../examples/D/s14/EXPECT.md) [obs](../tests/D/s14.spec.ts-snapshots/D-S14-console-darwin.txt) `... → PASS:s14-outer-catch-reached → S14 → PASS:s14-done` |
 
+Payload and captured-state controls added after S12:
+
+| Target | S11 nested exception_ptr crosses suspend | S13 copied exception object crosses suspend | S15 stable what pointer crosses suspend | S16 copied what string crosses suspend | S17 exception_ptr created after resume |
+|--------|-------------------------------------------|---------------------------------------------|-----------------------------------------|----------------------------------------|----------------------------------------|
+| A      | [PASS](../examples/A/s11/EXPECT.md) [obs](../tests/A/s11.spec.ts-snapshots/A-S11-console-darwin.txt) `... → PASS:s11-nested-catch-reached → PASS:s11-done` | [PASS](../examples/A/s13/EXPECT.md) [obs](../tests/A/s13.spec.ts-snapshots/A-S13-console-darwin.txt) `... → PASS:s13-copied-object-readable → PASS:s13-done` | [PASS](../examples/A/s15/EXPECT.md) [obs](../tests/A/s15.spec.ts-snapshots/A-S15-console-darwin.txt) `... → PASS:s15-pointer-readable → PASS:s15-done` | [PASS](../examples/A/s16/EXPECT.md) [obs](../tests/A/s16.spec.ts-snapshots/A-S16-console-darwin.txt) `... → PASS:s16-string-readable → PASS:s16-done` | [PASS](../examples/A/s17/EXPECT.md) [obs](../tests/A/s17.spec.ts-snapshots/A-S17-console-darwin.txt) `... → PASS:s17-rethrow-catch-reached → PASS:s17-done` |
+| B      | [FAIL](../examples/B/s11/EXPECT.md) [obs](../tests/B/s11.spec.ts-snapshots/B-S11-console-darwin.txt) `... → S11:after-second-resume → [pageerror] null function → [pageerror] unreachable → [timeout] no PASS:s11-done` | [WARN](../examples/B/s13/EXPECT.md) [obs](../tests/B/s13.spec.ts-snapshots/B-S13-console-darwin.txt) `... → PASS:s13-done → [pageerror] unreachable` | [WARN](../examples/B/s15/EXPECT.md) [obs](../tests/B/s15.spec.ts-snapshots/B-S15-console-darwin.txt) `... → PASS:s15-done → [pageerror] unreachable` | [WARN](../examples/B/s16/EXPECT.md) [obs](../tests/B/s16.spec.ts-snapshots/B-S16-console-darwin.txt) `... → PASS:s16-done → [pageerror] unreachable` | [PASS](../examples/B/s17/EXPECT.md) [obs](../tests/B/s17.spec.ts-snapshots/B-S17-console-darwin.txt) `... → PASS:s17-rethrow-catch-reached → PASS:s17-done` |
+| D      | [PASS](../examples/D/s11/EXPECT.md) [obs](../tests/D/s11.spec.ts-snapshots/D-S11-console-darwin.txt) `... → PASS:s11-nested-catch-reached → PASS:s11-done` | [PASS](../examples/D/s13/EXPECT.md) [obs](../tests/D/s13.spec.ts-snapshots/D-S13-console-darwin.txt) `... → PASS:s13-copied-object-readable → PASS:s13-done` | [PASS](../examples/D/s15/EXPECT.md) [obs](../tests/D/s15.spec.ts-snapshots/D-S15-console-darwin.txt) `... → PASS:s15-pointer-readable → PASS:s15-done` | [PASS](../examples/D/s16/EXPECT.md) [obs](../tests/D/s16.spec.ts-snapshots/D-S16-console-darwin.txt) `... → PASS:s16-string-readable → PASS:s16-done` | [PASS](../examples/D/s17/EXPECT.md) [obs](../tests/D/s17.spec.ts-snapshots/D-S17-console-darwin.txt) `... → PASS:s17-rethrow-catch-reached → PASS:s17-done` |
+
 ## Conventions
 
 - A cell is filled only after its Playwright spec runs successfully.
 - On pitfall reproduction (an "expected" failure), record the exact
   console sequence and link the `EXPECT.md` that explains the mechanism.
+- `WARN` means the scenario reached its explicit `PASS:*:done` line but still
+  emitted a post-done `[pageerror]` that should not be treated as clean success.
 - The `PASS` / `FAIL` lines referenced here are Wasm-side
   `console.log("PASS:<id>")` / `console.log("FAIL:<id>")` signals.
 - `[pageerror]` lines are JS `uncaughtException` events captured by Playwright,
