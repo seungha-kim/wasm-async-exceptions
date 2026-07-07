@@ -373,7 +373,9 @@ learn-asyncify/
   multi-yield 후 throw나 resume 이후 local `exception_ptr` 사용은 통과하므로,
   마이그레이션 경로로 다룰 때 "live/captured exception state가 suspend를 건너는
   패턴"을 별도 위험으로 문서화한다. S13/S15/S16의 post-done `unreachable`도 별도
-  경고 표면이다.
+  경고 표면이다. 이 pass/fail 차이는 안정적 의미론이 아니라 unsupported 조합에서
+  내부 상태 보존 경로를 피했는지 여부로 해석한다. B의 통과 케이스를 주변 코드에도
+  일반화하지 않는다.
 - **pitfall이 보통 알아채기 어려운 silent mis-behavior 일 수 있음**: 관측은
   correctness 위주로 assert-driven으로 만든다(`EXPECT.md`에 PASS/FAIL 명시).
 

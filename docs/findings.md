@@ -20,6 +20,9 @@ The completed matrix gives a sharper answer:
   `exception_ptr` that does not cross a later suspend, but fails when live or
   captured Wasm EH exception state must cross a suspend boundary. S13/S15/S16
   reach `PASS:done` but still emit a post-done `unreachable` pageerror on B.
+  This should be read as an unsupported-combination result, not as a stable
+  semantic contract: the passing B cases are the shapes where Asyncify happens
+  not to preserve live/captured Wasm EH state across a suspend.
   The earlier S5-S10/S12/S14 pass/fail pattern was reproduced with emsdk
   4.0.23 as a toolchain cross-check, not only with the repository's pinned
   6.0.1 toolchain.
@@ -58,7 +61,9 @@ representative pageerror surfaces. The short version:
   add a post-done trap warning even when only copied payload data crosses the
   suspend. B/S8, B/S14, and B/S17 passing narrow the claim: ordinary
   multi-yield restoration followed by a C++ throw, or local `exception_ptr`
-  use after resume, can still work.
+  use after resume, can still work. These passing cells should not be
+  generalized into "Asyncify + Wasm EH is mostly safe"; they are narrower cases
+  that avoid the unsupported state-preservation path.
 - E/E' avoid failure-timeout paths in S3/S4 because the rejected async
   settlement is converted into a C++ throw after coroutine resume.
 
@@ -882,6 +887,14 @@ They do establish a narrower correctness distinction:
 - S8, S14, and S17 pass on B, which rules out the broader explanation that
   deep/repeated multi-yield call chains or local `exception_ptr` use by
   themselves break outer C++ catch.
+
+The uneven B pattern is expected for this kind of unsupported mix. Asyncify
+rewrites calls so it can save and restore a suspended Wasm stack, while Wasm EH
+uses runtime-managed exception state for catch, unwind, and rethrow. When those
+two mechanisms do not need to preserve the same exception state across the same
+suspend boundary, some examples complete. When they do, B fails or traps after
+completion. Therefore B's pass cases are best treated as accidental safe
+shapes, not guarantees that nearby source changes will remain safe.
 
 ### Toolchain cross-check — emsdk 4.0.23
 
