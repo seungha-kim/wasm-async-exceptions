@@ -607,6 +607,21 @@ catch on all three targets. B therefore does not fail merely because C++ throws
 after multiple resolved yields. Its S5-S7 failures are tied to suspending while
 catch/unwind/rethrow exception state is already live.
 
+The ordering is the key distinction:
+
+```text
+S8: suspend/resume -> suspend/resume -> suspend/resume -> throw -> catch
+S5: throw -> catch begins -> suspend/resume while catch state is live
+S6: throw -> unwind begins -> suspend/resume inside destructor during unwind
+S7: throw -> catch begins -> suspend/resume while rethrow state is live -> throw;
+```
+
+So B/S8 only asks Asyncify to restore normal call frames before Wasm EH starts
+unwinding. B/S5-S7 ask Asyncify to save and restore frames while Wasm EH's
+exception state is already active. That is the shape that matches the
+`ASYNCIFY=1` plus `-fwasm-exceptions` incompatibility warning and the observed
+`null function` / `unreachable` failures.
+
 ### Phase 4 summary
 
 The stress tests do **not** support the original hoped-for claim that

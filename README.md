@@ -70,6 +70,13 @@ scripts/collect-size-metrics.sh
 C++ throw/catch/unwind와 suspend만 섞는다. 관측 결과 S5-S7은 A/D 통과, B 실패이고,
 S8은 A/B/D 모두 통과다.
 
+S8이 B에서도 통과한 이유는 suspend 시점이 다르기 때문이다. S8의 모든 suspend는
+예외가 발생하기 전 정상 call chain 안에서 끝나고, 그 뒤 `level3`의 C++ `throw`는
+동기적으로 outer catch까지 unwind된다. 반대로 S5-S7은 catch handler, destructor
+unwind, rethrow 준비 상태처럼 **live C++ exception state**가 있는 동안 suspend한다.
+따라서 B의 실패 조건은 "여러 yield 뒤 throw"가 아니라 "Wasm EH의 예외 상태를
+Asyncify가 저장/복원해야 하는 suspend"로 좁혀진다.
+
 ## 시나리오 요약
 
 | Scenario | 대상 | 핵심 질문 |
