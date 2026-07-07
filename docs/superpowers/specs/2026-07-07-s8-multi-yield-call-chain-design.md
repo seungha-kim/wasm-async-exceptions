@@ -74,6 +74,10 @@ failure for the scenario.
   resume.
 - D is expected to pass, based on the existing S5-S7 JSPI + Wasm EH results.
 
+Post-implementation observation: B also passes S8. This narrows the B failure
+surface from "any C++ throw after multiple resolved yields" to the S5-S7 shapes
+where catch/unwind/rethrow exception state is live across a suspend.
+
 ## Test and Documentation Plan
 
 Add `src/scenarios/S8.cpp`, A/B/D example wrappers and expectations, CMake

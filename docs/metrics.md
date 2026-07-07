@@ -96,10 +96,11 @@ Timing interpretation:
 - Passing rows complete in tens of milliseconds in this harness. The C++20
   coroutine rows E/E' avoid the long timeout path for S3/S4 because rejected
   settlement is converted into C++ control flow by `await_resume()`.
-- S5-S7 are not included in this Phase 3.5 timing table. Their Phase 4
-  snapshots record a different class of failure: B (Asyncify + Wasm EH)
-  reaches the C++-initiated stress path and then fails with `null function` /
-  `unreachable`, while A and D complete.
+- S5-S8 are not included in this Phase 3.5 timing table. Their Phase 4
+  snapshots record a different class of observation: S5-S7 show B
+  (Asyncify + Wasm EH) reaching the C++-initiated stress path and then failing
+  with `null function` / `unreachable`, while S8 shows B can still complete a
+  simpler multi-yield call-chain throw to an outer catch.
 
 ## Representative Error Surfaces
 
@@ -109,7 +110,8 @@ Timing interpretation:
 | C/S1 | `trying to suspend JS frames` | JSPI cannot suspend through this JS frame shape |
 | D/S3 | `S3` | rejected JS Promise still does not become C++ catchable |
 | D/S4 | `S4` | first rejected await escapes before second await can be driven |
-| B/S5-S7 | `null function` / `unreachable` | Asyncify + Wasm EH fails C++-initiated exception/suspend stress |
+| B/S5-S7 | `null function` / `unreachable` | Asyncify + Wasm EH fails when live exception state crosses suspend |
+| B/S8 | - | Asyncify + Wasm EH can catch an inner C++ throw after several resolved yields |
 
 The exact browser stack trace is intentionally not recorded here; only the
 stable leading message and class are used for comparison.

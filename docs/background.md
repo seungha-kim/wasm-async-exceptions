@@ -51,9 +51,10 @@ are *hypotheses* for this project to verify, not pre-established facts.
 
 One important observation from this repository is that standardizing only the
 exception axis is not necessarily a safe intermediate step. The Asyncify +
-Wasm EH row (target B) still uses Asyncify for suspension, and S5-S7 show it
-failing even when every JS async operation resolves and every exception starts
-inside C++.
+Wasm EH row (target B) still uses Asyncify for suspension. S5-S7 show it can
+fail even when every JS async operation resolves and every exception starts
+inside C++, while S8 shows that ordinary multi-yield call-chain restoration
+followed by an inner C++ throw can still reach the outer catch.
 
 ## 5. The third path: C++20 coroutines
 

@@ -1,0 +1,9 @@
+S8:l1-before-suspend
+S8:l1-after-resume
+S8:l2-before-suspend
+S8:l2-after-resume
+S8:l3-before-suspend
+S8:l3-after-resume
+PASS:s8-outer-catch-reached
+S8
+PASS:s8-done

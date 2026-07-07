@@ -54,6 +54,7 @@ A second A/B/D-only stress set removes JS rejection entirely:
 - S5: C++ throw, catch, then suspend inside the catch
 - S6: destructor suspends during C++ exception unwind
 - S7: catch, suspend, then rethrow
+- S8: multi-yield call chain, inner C++ throw, outer catch
 
 ### 3. Key observations
 
@@ -70,10 +71,10 @@ E/E' pass all scenarios because they do not rely on Promise rejection crossing
 the Wasm boundary. JS records settlement, resumes the coroutine handle, and
 C++ throws from `await_resume()` if the settlement was rejected.
 
-The resolution-only S5-S7 stress set gives a separate migration finding:
-A and D pass, while B fails with `null function` / `unreachable`. That means
-"turn on Wasm EH but keep Asyncify" is not a safe intermediate path for code
-that mixes C++ exceptions with suspension.
+The resolution-only S5-S8 stress set gives a separate migration finding:
+A and D pass all four. B fails S5-S7 with `null function` / `unreachable`, but
+passes S8. That means "turn on Wasm EH but keep Asyncify" is not a safe
+intermediate path for code that suspends while C++ exception state is live.
 
 ### 4. Metrics
 
@@ -87,6 +88,8 @@ The metrics reinforce the control-flow finding:
   path in S3/S4.
 - B's S5-S7 failures are correctness failures, not timing artifacts; the long
   duration is the test waiting for a `PASS:*done` line that never arrives.
+- B/S8 passing narrows the failure boundary: the issue is not simply deep
+  multi-yield call-chain restoration.
 
 ### 5. Recommended pattern
 
