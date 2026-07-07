@@ -1,0 +1,8 @@
+S7:before-first-suspend
+S7:after-first-resume
+S7:inner-catch
+S7
+S7:after-inner-resume
+[pageerror] null function
+[pageerror] unreachable
+[timeout] no PASS:s7-done

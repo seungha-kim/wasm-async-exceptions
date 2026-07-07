@@ -1,0 +1,8 @@
+S7:before-first-suspend
+S7:after-first-resume
+S7:inner-catch
+S7
+S7:after-inner-resume
+PASS:s7-outer-catch-reached
+S7
+PASS:s7-done

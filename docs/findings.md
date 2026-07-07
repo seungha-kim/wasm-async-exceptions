@@ -529,3 +529,66 @@ Detailed measurements live in `docs/metrics.md`. The high-level result is:
 The metrics reinforce the main conclusion: the reliable boundary is not
 "Promise rejection crosses into C++"; it is "JS settlement is data, and C++
 chooses whether to throw after resume."
+
+## Phase 4 — Resolution-only C++ exception stress tests
+
+S5-S7 were added to test a narrower claim: can we find code that fails on an
+Asyncify row but passes on JSPI + Wasm EH without relying on rejected JS
+Promises? All three scenarios use only resolved controlled Promises; every
+exception originates in C++.
+
+### S5 — C++ throw, catch, then suspend inside catch
+
+Observed:
+
+- A: passes.
+- B: reaches the second resume, then reports `[pageerror] null function`,
+  `[pageerror] unreachable`, and never logs `PASS:s5-done`.
+- D: passes.
+
+Mapping: This did not produce the desired A-vs-D split. Asyncify + JS EH
+handled catch-then-resuspend correctly. The failure appears only when Asyncify
+is combined with Wasm EH.
+
+### S6 — destructor suspends during C++ unwind
+
+Observed:
+
+- A: passes.
+- B: resumes from the destructor suspend, then reports `[pageerror] null
+  function`, `[pageerror] unreachable`, and never reaches the catch/done
+  sequence.
+- D: passes.
+
+Mapping: This is the strongest new stress case. It exercises suspend from a
+destructor while C++ exception unwinding is in progress. Again, the observed
+split is B-vs-D, not A-vs-D.
+
+### S7 — catch, suspend, then rethrow
+
+Observed:
+
+- A: passes.
+- B: resumes after the inner-catch suspend, then reports `[pageerror] null
+  function`, `[pageerror] unreachable`, and never reaches the outer catch.
+- D: passes.
+
+Mapping: Saved exception/rethrow state survives the suspend on A and D. B's
+failure is consistent with Emscripten's warning that `ASYNCIFY=1` is not
+compatible with `-fwasm-exceptions` for programs that mix Asyncify and
+exceptions.
+
+### Phase 4 summary
+
+The new stress tests do **not** support the original hoped-for claim that
+Asyncify + JS exception emulation fails while JSPI + Wasm EH passes. A passes
+S5-S7.
+
+They do establish a narrower correctness distinction:
+
+- Asyncify + Wasm EH (B) fails C++-initiated exception/suspend stress paths
+  even with no rejected JS Promise.
+- JSPI + Wasm EH (D) passes the same paths.
+- Asyncify + JS EH (A) also passes these particular paths, so it remains a
+  stronger practical baseline than expected for C++-initiated exceptions after
+  resolved async work.

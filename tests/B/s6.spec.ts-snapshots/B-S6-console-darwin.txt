@@ -1,0 +1,7 @@
+S6:before-work-suspend
+S6:after-work-resume
+S6:dtor-before-suspend
+PASS:s6-dtor-after-resume
+[pageerror] null function
+[pageerror] unreachable
+[timeout] no PASS:s6-done
