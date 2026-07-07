@@ -4,6 +4,8 @@
 int main() {
   try {
     scenario_log("S1:before-throw");
+    // Baseline C++ throw without coroutine suspend.
+    // Observed: E and E' pass.
     throw std::runtime_error("S1");
     scenario_log("FAIL:s1-after-throw-unreachable");
   } catch (const std::exception& e) {

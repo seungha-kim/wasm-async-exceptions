@@ -4,6 +4,8 @@
 int main() {
   try {
     scenario_log("S3:before-suspend");
+    // Key rejected-Promise boundary: JS rejects the controlled Promise.
+    // Observed: A/B/D miss C++ catch and surface pageerror; C fails earlier.
     await_controlled_promise("s3-1");
     // If control returns here it means the rejected Promise was NOT propagated
     // as a throw on resume — itself an observation worth logging.

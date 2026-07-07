@@ -4,6 +4,8 @@
 ScenarioTask scenario() {
   try {
     scenario_log("S2:before-suspend");
+    // Resolve-only coroutine suspend, followed by a C++-initiated throw.
+    // Observed: E and E' pass.
     co_await await_controlled_promise("s2-1");
     scenario_log("S2:after-resume");
     throw std::runtime_error("S2");

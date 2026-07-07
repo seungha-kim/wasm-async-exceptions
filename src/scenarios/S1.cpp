@@ -4,6 +4,8 @@
 int main() {
   try {
     scenario_log("S1:before-throw");
+    // Baseline C++ throw without suspend.
+    // Observed: A/B/D pass; C fails in this harness before catch reaches done.
     throw std::runtime_error("S1");
     scenario_log("FAIL:s1-after-throw-unreachable");
   } catch (const std::exception& e) {
