@@ -49,6 +49,12 @@ are *hypotheses* for this project to verify, not pre-established facts.
 - **Wasm exception handling** — `try`/`catch`/`throw` become opcodes; the
   unwind is performed by the runtime, not by per-call flag checks.
 
+One important observation from this repository is that standardizing only the
+exception axis is not necessarily a safe intermediate step. The Asyncify +
+Wasm EH row (target B) still uses Asyncify for suspension, and S5-S7 show it
+failing even when every JS async operation resolves and every exception starts
+inside C++.
+
 ## 5. The third path: C++20 coroutines
 
 A C++20 coroutine stores its locals in a heap-allocated frame and *returns*
@@ -63,4 +69,6 @@ JSPI and Wasm EH are both shipped in stable Chrome
 (`chromestatus.com/feature/5675224515231744`). Emscripten supports both;
 serious use outside Chrome is still uneven, so this project treats the
 Asyncify + JS EH combination as the *practical default* and JSPI + Wasm EH
-and C++20 coroutine as the *standardized exits* to compare against.
+and C++20 coroutine as the *standardized exits* to compare against. It does
+not treat Asyncify + Wasm EH as a safe stepping-stone; in the current
+observations that mix is the fragile row.

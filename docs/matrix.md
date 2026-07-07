@@ -23,7 +23,8 @@ Wasm boundary.
 These scenarios are run only on A/B/D:
 
 - A: practical Asyncify + JS exception emulation baseline.
-- B: Asyncify + Wasm EH, useful for isolating the EH-axis change.
+- B: Asyncify + Wasm EH, useful for isolating the EH-axis change and now
+  documented as a fragile intermediate path.
 - D: JSPI + Wasm EH, the fully standardized runtime path.
 
 | Target | S5 C++ throw → catch → suspend in catch | S6 destructor suspends during C++ unwind | S7 catch → suspend → rethrow |

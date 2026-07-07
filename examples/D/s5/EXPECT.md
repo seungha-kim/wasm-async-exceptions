@@ -6,5 +6,10 @@ catch block.
 
 ## Hypothesis under test
 
-This is the standard-path comparison point for A/S5. A pass here with an A
-failure would support a concrete correctness advantage for JSPI + Wasm EH.
+This is the standard-path comparison point for A/B S5. In the observed matrix
+A and D both pass, while B fails; the useful distinction is therefore
+Asyncify+Wasm-EH versus JSPI+Wasm-EH, not A versus D.
+
+## Observed result
+
+D reaches `PASS:s5-done`.

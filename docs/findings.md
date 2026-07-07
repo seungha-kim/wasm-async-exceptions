@@ -13,6 +13,9 @@ The completed matrix gives a sharper answer:
 - Switching one or both runtime axes to JSPI/Wasm EH changes code size and
   some failure surfaces, but it does not by itself define a C++ exception
   boundary for rejected JS Promises.
+- Asyncify + Wasm EH is not a safe intermediate migration path in this
+  harness: resolution-only C++ exception stress scenarios S5-S7 fail on B
+  while A and D pass.
 - C++20 coroutine glue works for all four scenarios because it treats JS
   settlement as data, resumes C++, and throws from C++ in `await_resume()`.
 
@@ -26,10 +29,10 @@ The practical rule is therefore:
 
 | Target | Result | Interpretation |
 |---|---|---|
-| A — Asyncify + JS EH | S2 passes; S3/S4 fail | C++ throw after resume works; JS rejection escapes. |
-| B — Asyncify + Wasm EH | S1/S2 pass; S3/S4 fail | Wasm EH does not make rejected JS Promises catchable. |
+| A — Asyncify + JS EH | S2 and S5-S7 pass; S3/S4 fail | C++-initiated exception/suspend paths work; JS rejection escapes. |
+| B — Asyncify + Wasm EH | S1/S2 pass; S3/S4 and S5-S7 fail | Wasm EH does not make rejected JS Promises catchable, and this mix also fails resolution-only exception/suspend stress. |
 | C — JSPI + JS EH | all scenarios fail in this harness | JS EH remains incompatible with this JSPI frame shape. |
-| D — JSPI + Wasm EH | S1/S2 pass; S3/S4 fail | Runtime standards reduce glue, but JS rejection still escapes. |
+| D — JSPI + Wasm EH | S1/S2 and S5-S7 pass; S3/S4 fail | Runtime standards handle C++-initiated stress paths, but JS rejection still escapes. |
 | E — C++20 coroutine + JS EH | all scenarios pass | Developer-owned settlement conversion restores C++ control flow. |
 | E' — C++20 coroutine + Wasm EH | all scenarios pass | Same behavioral result as E; Wasm EH mainly changes generated code shape. |
 
@@ -42,6 +45,9 @@ representative pageerror surfaces. The short version:
   scenarios.
 - JSPI rows C/D reduce generated code size but still need an explicit
   settlement boundary for JS rejection.
+- B's S5-S7 failures show that "turn on Wasm EH while staying on Asyncify" is
+  not just an incomplete fix for JS rejection; it can introduce failures for
+  C++-initiated exception/suspend paths.
 - E/E' avoid failure-timeout paths in S3/S4 because the rejected async
   settlement is converted into a C++ throw after coroutine resume.
 
@@ -331,9 +337,9 @@ tested with Wasm EH before it can be treated as a viable exit.
 ### Implications for Phase 3 (target D)
 
 Target D (JSPI + Wasm EH) is now the decisive test, not just the expected
-union of B and C's gains. It must show both that removing JS EH eliminates
-the C-row `trying to suspend JS frames` failure and that removing Asyncify
-eliminates the A/B-row JS-initiated rejection leak.
+union of B and C's gains. The hypothesis to test is whether removing JS EH
+eliminates the C-row `trying to suspend JS frames` failure and whether
+removing Asyncify also eliminates the A/B-row JS-initiated rejection leak.
 
 ## Phase 3 — Both runtime standards (target D)
 
@@ -414,6 +420,9 @@ only sees exceptions thrown from inside Wasm/C++ control flow.
   catchable exception. Test that path explicitly.
 - Prefer resolving async imports with a status/result value and throwing from
   C++ after resume if C++ catch semantics are required.
+- Do not treat Asyncify + Wasm EH as a safe halfway migration step. S5-S7 show
+  B failing resolution-only C++ exception/suspend stress paths that A and D
+  pass.
 - Keep Playwright coverage for both resolution and rejection paths; S2 passing
   does not imply S3/S4 are safe.
 - Treat JSPI support as experimental in Emscripten 6.0.1 and pin the toolchain

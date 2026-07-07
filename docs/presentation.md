@@ -9,7 +9,9 @@ C++ exceptions.
 
 Rejected JS Promises do not automatically become C++ exceptions; if C++
 `catch` semantics matter, JS async settlement must be converted into C++
-control flow explicitly.
+control flow explicitly. Separately, Asyncify + Wasm EH is a fragile
+intermediate migration target: it fails C++-initiated exception/suspend stress
+cases that both Asyncify + JS EH and JSPI + Wasm EH handle.
 
 ## 10-minute outline
 
@@ -47,6 +49,12 @@ Each target runs four scenarios:
 - S3: suspended async operation rejects
 - S4: catch, then await again
 
+A second A/B/D-only stress set removes JS rejection entirely:
+
+- S5: C++ throw, catch, then suspend inside the catch
+- S6: destructor suspends during C++ exception unwind
+- S7: catch, suspend, then rethrow
+
 ### 3. Key observations
 
 S2 passes on A/B/D because the throw originates from C++ after a successful
@@ -62,6 +70,11 @@ E/E' pass all scenarios because they do not rely on Promise rejection crossing
 the Wasm boundary. JS records settlement, resumes the coroutine handle, and
 C++ throws from `await_resume()` if the settlement was rejected.
 
+The resolution-only S5-S7 stress set gives a separate migration finding:
+A and D pass, while B fails with `null function` / `unreachable`. That means
+"turn on Wasm EH but keep Asyncify" is not a safe intermediate path for code
+that mixes C++ exceptions with suspension.
+
 ### 4. Metrics
 
 The metrics reinforce the control-flow finding:
@@ -72,6 +85,8 @@ The metrics reinforce the control-flow finding:
   boundary on their own.
 - C++20 coroutine rows add developer-owned glue, but avoid the failure-timeout
   path in S3/S4.
+- B's S5-S7 failures are correctness failures, not timing artifacts; the long
+  duration is the test waiting for a `PASS:*done` line that never arrives.
 
 ### 5. Recommended pattern
 
@@ -89,7 +104,9 @@ observed as a C++ exception.
 
 JSPI and Wasm EH are valuable because they reduce runtime emulation and code
 size, but they are not a substitute for a deliberate exception boundary
-between JavaScript async settlement and C++ control flow.
+between JavaScript async settlement and C++ control flow. When adopting Wasm
+EH, avoid treating Asyncify + Wasm EH as a low-risk halfway house; test the
+combined exception/suspend paths or move the stack-switching axis too.
 
 ## Demo commands
 
@@ -120,3 +137,18 @@ cd examples/E/s3
 
 Expected takeaway: E/S3 reaches `PASS:s3-catch-reached` because C++ throws
 after coroutine resume.
+
+Migration stress demo:
+
+```sh
+cd examples/B/s6
+./build.sh
+./run.sh
+
+cd ../../D/s6
+./build.sh
+./run.sh
+```
+
+Expected takeaway: B/S6 reaches destructor resume and then fails with
+`null function` / `unreachable`; D/S6 reaches `PASS:s6-done`.
