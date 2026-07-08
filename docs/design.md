@@ -82,6 +82,12 @@ Emscripten은 이 두 가지를 **JS+바이너리 계측**으로 에뮬레이션
 > 지원과 Emscripten 컴파일러 측 대응은 여전히 진행 중이라, 본 프로젝트는 “현재의
 > 페인(A)”과 “표준(D/E')”을 나란히 보여준다.
 
+> **Event loop 주의**: Asyncify/JSPI/C++ coroutine 중 무엇을 쓰는지와 별개로,
+> browser responsiveness는 await하는 Promise의 settle 방식에 크게 좌우된다.
+> 이미 resolve된 Promise를 반복 await하면 microtask queue만 계속 돌 수 있고,
+> `setTimeout`, `requestAnimationFrame`, 실제 fetch/WebGPU completion처럼 task/frame/API
+> 경계를 만드는 Promise를 await해야 브라우저가 paint나 다른 event를 처리할 틈을 얻는다.
+
 ### 1.4 세 번째 탈출구: C++20 코루틴으로 “코루틴 에뮬레이션 자체”를 피하기
 Asyncify와 JSPI는 “Wasm이 멈춰야(cooperative suspend) 한다”는 전제 위에서 동작한다.
 그러나 C++20 coroutine은 *다른 길*을 쓴다:

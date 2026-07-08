@@ -168,6 +168,9 @@ S3:before-suspend
 - synchronous C++ throw/catch와 successful resume 이후 C++ throw에는 Wasm EH가 유용하다.
 - rejected JS Promise가 C++ catchable exception이 된다고 가정하지 말라.
 - C++ catch semantics가 필요하면 async import를 status/result value로 resolve하고, resume 이후 C++에서 throw하라.
+- browser responsiveness를 Asyncify냐 JSPI냐만으로 판단하지 말라. 이미 resolve된
+  Promise를 반복 await하면 microtask queue에 머물 수 있다. paint나 다른 event 처리
+  기회가 필요하면 timer, `requestAnimationFrame`, 실제 API completion Promise를 await하라.
 - Asyncify + Wasm EH를 안전한 halfway migration step으로 보지 말라. Phase 4의 stress test가 이 점을 더 강하게 보여준다.
 - JSPI는 Emscripten 6.0.1 기준 여전히 experimental warning이 있으므로 관찰을 기록할 때 toolchain을 pin하라.
 

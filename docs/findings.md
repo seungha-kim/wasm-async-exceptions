@@ -436,6 +436,10 @@ only sees exceptions thrown from inside Wasm/C++ control flow.
   catchable exception. Test that path explicitly.
 - Prefer resolving async imports with a status/result value and throwing from
   C++ after resume if C++ catch semantics are required.
+- Do not infer browser responsiveness from Asyncify vs JSPI alone. Repeatedly
+  awaiting already-settled Promises can stay on the microtask queue; use timer,
+  `requestAnimationFrame`, or real API-completion Promises when the browser must
+  get a chance to paint or process other events.
 - Do not treat Asyncify + Wasm EH as a safe halfway migration step. S5-S7/S9-S12 show
   B failing resolution-only C++ exception/suspend stress paths that A and D
   pass. S8/S14/S17 also show the boundary is not "any throw after several yields";
